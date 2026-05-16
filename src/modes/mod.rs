@@ -1,4 +1,5 @@
 pub mod build;
+pub mod deploy;
 
 use ratatui::{
     text::{Line},

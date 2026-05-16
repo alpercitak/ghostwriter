@@ -21,6 +21,7 @@ struct Cli {
 #[derive(Clone, ValueEnum)]
 pub enum Mode {
     Build,
+    Deploy
 }
 
 #[tokio::main]
