@@ -1,0 +1,26 @@
+[package]
+name = "ghostwriter"
+version = "0.1.0"
+edition = "2024"
+description = "Generate fake but realistic terminal activity"
+authors = ["ghostwriter"]
+
+[[bin]]
+name = "ghostwriter"
+path = "src/main.rs"
+
+[dependencies]
+ratatui     = "0.30"
+crossterm   = "0.29"
+rand        = "0.10"
+rand_chacha = "0.10"
+clap        = { version = "4.6", features = ["derive"] }
+tokio       = { version = "1.43", features = ["full"] }
+async-trait = "0.1"
+anyhow      = "1.0"
+
+[profile.release]
+opt-level = "z"     # Minimize binary size
+lto = true          # Link-time optimization
+codegen-units = 1   # Better optimization, slower compile
+strip = true        # Strip debug symbols from binary
