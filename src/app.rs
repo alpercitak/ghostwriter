@@ -9,7 +9,7 @@ use crossterm::{
 use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
 
 use crate::{
-    modes::{build::BuildMode, deploy::DeployMode, Tick, TickResult},
+    modes::{build::BuildMode, deploy::DeployMode, incident::IncidentMode, Tick, TickResult},
     ui,
     Mode,
 };
@@ -39,8 +39,12 @@ impl App {
                 let mut mode = BuildMode::new(&self.seed);
                 self.event_loop(&mut terminal, &mut mode).await
             }
-             Mode::Deploy => {
+            Mode::Deploy => {
                 let mut mode = DeployMode::new(&self.seed);
+                self.event_loop(&mut terminal, &mut mode).await
+            }
+            Mode::Incident => {
+                let mut mode = IncidentMode::new(&self.seed);
                 self.event_loop(&mut terminal, &mut mode).await
             }
         };

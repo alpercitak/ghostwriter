@@ -1,5 +1,6 @@
 pub mod build;
 pub mod deploy;
+pub mod incident;
 
 use ratatui::{
     text::{Line},
@@ -23,6 +24,15 @@ pub enum Status {
     Running,
     Success,
     Failed,
+}
+
+pub fn hash_seed(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
 }
 
 pub trait Tick {
