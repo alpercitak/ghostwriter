@@ -1,6 +1,7 @@
 pub mod build;
 pub mod deploy;
 pub mod incident;
+pub mod review;
 
 use ratatui::{
     text::{Line},

@@ -22,7 +22,8 @@ struct Cli {
 pub enum Mode {
     Build,
     Deploy,
-    Incident
+    Incident,
+    Review
 }
 
 #[tokio::main]
