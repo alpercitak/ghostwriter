@@ -17,11 +17,12 @@ use crate::{
 pub struct App {
     mode: Mode,
     seed: String,
+    speed: f32,
 }
 
 impl App {
-    pub fn new(mode: Mode, seed: String) -> Self {
-        Self { mode, seed }
+    pub fn new(mode: Mode, seed: String, speed: f32) -> Self {
+        Self { mode, seed, speed }
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
@@ -37,19 +38,19 @@ impl App {
         let result = match self.mode {
             Mode::Build => {
                 let mut mode = BuildMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode).await
+                self.event_loop(&mut terminal, &mut mode, self.speed).await
             }
             Mode::Deploy => {
                 let mut mode = DeployMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode).await
+                self.event_loop(&mut terminal, &mut mode, self.speed).await
             }
             Mode::Incident => {
                 let mut mode = IncidentMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode).await
+                self.event_loop(&mut terminal, &mut mode, self.speed).await
             }
             Mode::Review => {
                 let mut mode = ReviewMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode).await
+                self.event_loop(&mut terminal, &mut mode, self.speed).await
             }
         };
 
@@ -64,6 +65,7 @@ impl App {
         &self,
         terminal: &mut Terminal<B>,
         mode: &mut M,
+        speed: f32,
     ) -> anyhow::Result<()>
     where
         B: Backend,
@@ -84,7 +86,10 @@ impl App {
             }
 
             match mode.tick().await {
-                TickResult::Continue => {}
+                TickResult::Continue => {
+                    let delay = (50.0 / speed.max(0.1)) as u64;
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                }
                 TickResult::Done => {
                     terminal.draw(|frame| ui::render(frame, mode.state()))?;
                     loop {

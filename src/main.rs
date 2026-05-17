@@ -16,6 +16,10 @@ struct Cli {
     /// Optional seed string (e.g. repo name) for consistent output
     #[arg(long, default_value = "ghost")]
     seed: String,
+
+    /// Playback speed multiplier (0.5 = half speed, 2.0 = double)
+    #[arg(long, default_value = "1.0")]
+    speed: f32,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -29,6 +33,6 @@ pub enum Mode {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let mut app = App::new(cli.mode, cli.seed);
+    let mut app = App::new(cli.mode, cli.seed, cli.speed);
     app.run().await
 }
