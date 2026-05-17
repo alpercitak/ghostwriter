@@ -80,12 +80,11 @@ impl App {
                 ui::render(frame, mode.state());
             })?;
 
-            if event::poll(Duration::from_millis(50))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
-                        break;
-                    }
-                }
+            if event::poll(Duration::from_millis(50))?
+                && let Event::Key(key) = event::read()?
+                && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
+            {
+                break;
             }
 
             match mode.tick().await {
@@ -96,10 +95,10 @@ impl App {
                 TickResult::Done => {
                     terminal.draw(|frame| ui::render(frame, mode.state()))?;
                     loop {
-                        if event::poll(Duration::from_millis(200))? {
-                            if let Event::Key(_) = event::read()? {
-                                break;
-                            }
+                        if event::poll(Duration::from_millis(200))?
+                            && let Event::Key(_) = event::read()?
+                        {
+                            break;
                         }
                     }
                     break;
