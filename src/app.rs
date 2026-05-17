@@ -4,14 +4,17 @@ use std::time::Duration;
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::Backend, backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::Backend, backend::CrosstermBackend};
 
 use crate::{
-    modes::{build::BuildMode, deploy::DeployMode, incident::IncidentMode, review::ReviewMode, Tick, TickResult},
-    ui,
     Mode,
+    modes::{
+        Tick, TickResult, build::BuildMode, deploy::DeployMode, incident::IncidentMode,
+        review::ReviewMode,
+    },
+    ui,
 };
 
 pub struct App {
@@ -28,7 +31,7 @@ impl App {
     pub async fn run(&mut self) -> anyhow::Result<()> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        
+
         execute!(stdout, EnterAlternateScreen)?;
 
         let backend = CrosstermBackend::new(stdout);

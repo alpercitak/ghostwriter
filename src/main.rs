@@ -2,8 +2,8 @@ mod app;
 mod modes;
 mod ui;
 
-use clap::{Parser, ValueEnum};
 use app::App;
+use clap::{Parser, ValueEnum};
 
 /// ghostwriter — generate realistic-looking fake terminal activity
 #[derive(Parser)]
@@ -27,7 +27,7 @@ pub enum Mode {
     Build,
     Deploy,
     Incident,
-    Review
+    Review,
 }
 
 #[tokio::main]

@@ -7,25 +7,25 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use super::{hash_seed, RenderState, Status, Tick, TickResult};
+use super::{RenderState, Status, Tick, TickResult, hash_seed};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
-    Detecting,   // error spike alert fires
-    Triaging,    // pulling logs, identifying source
-    Mitigating,  // applying fix (rollback / scale / flag)
-    Resolving,   // error rate dropping, monitors green
+    Detecting,  // error spike alert fires
+    Triaging,   // pulling logs, identifying source
+    Mitigating, // applying fix (rollback / scale / flag)
+    Resolving,  // error rate dropping, monitors green
     Done,
 }
 
 impl Phase {
     fn next(self) -> Self {
         match self {
-            Phase::Detecting  => Phase::Triaging,
-            Phase::Triaging   => Phase::Mitigating,
+            Phase::Detecting => Phase::Triaging,
+            Phase::Triaging => Phase::Mitigating,
             Phase::Mitigating => Phase::Resolving,
-            Phase::Resolving  => Phase::Done,
-            Phase::Done       => Phase::Done,
+            Phase::Resolving => Phase::Done,
+            Phase::Done => Phase::Done,
         }
     }
 }
@@ -42,7 +42,7 @@ pub struct IncidentMode {
 
     service: String,
     error_code: u16,
-    error_rate_start: u32,  // req/min at spike peak
+    error_rate_start: u32, // req/min at spike peak
     runbook_id: String,
 }
 
@@ -50,11 +50,7 @@ impl IncidentMode {
     pub fn new(seed: &str) -> Self {
         let mut rng = ChaCha8Rng::seed_from_u64(hash_seed(seed));
 
-        let service = format!(
-            "{}-{}",
-            seed,
-            SUFFIXES[rng.random_range(0..SUFFIXES.len())]
-        );
+        let service = format!("{}-{}", seed, SUFFIXES[rng.random_range(0..SUFFIXES.len())]);
         let error_code = ERROR_CODES[rng.random_range(0..ERROR_CODES.len())];
         let error_rate_start = rng.random_range(120..980u32);
         let runbook_id = format!("RB-{}", rng.random_range(1000..9999u32));
@@ -103,11 +99,11 @@ impl Tick for IncidentMode {
         }
 
         match self.phase {
-            Phase::Detecting  => self.tick_detecting(),
-            Phase::Triaging   => self.tick_triaging(),
+            Phase::Detecting => self.tick_detecting(),
+            Phase::Triaging => self.tick_triaging(),
             Phase::Mitigating => self.tick_mitigating(),
-            Phase::Resolving  => self.tick_resolving(),
-            Phase::Done       => {}
+            Phase::Resolving => self.tick_resolving(),
+            Phase::Done => {}
         }
 
         TickResult::Continue
@@ -134,16 +130,21 @@ impl IncidentMode {
                     Span::styled("  severity  ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         "SEV-2",
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled("  auto-paging on-call", Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        "  auto-paging on-call",
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
                 self.wait_ticks = self.rng.random_range(6..14);
             }
             1 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  runbook   ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("https://runbooks.internal/{}", runbook_id)),
+                    Span::raw(format!("https://runbooks.internal/{runbook_id}")),
                 ]));
                 self.wait_ticks = self.rng.random_range(4..10);
             }
@@ -165,7 +166,7 @@ impl IncidentMode {
             _ => {
                 self.log.push(Line::from(vec![
                     Span::styled("  affects   ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("{}", service)),
+                    Span::raw(service.to_string()),
                 ]));
                 self.log.push(Line::raw(""));
                 self.wait_ticks = self.rng.random_range(4..8);
@@ -185,7 +186,7 @@ impl IncidentMode {
             0 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  ▶ triage  ", Style::default().fg(Color::Magenta)),
-                    Span::raw(format!("pulling logs for {}", service)),
+                    Span::raw(format!("pulling logs for {service}")),
                 ]));
                 self.wait_ticks = self.rng.random_range(10..22);
                 self.progress = 0.22;
@@ -207,7 +208,7 @@ impl IncidentMode {
                 self.log.push(Line::from(vec![
                     Span::styled("  source    ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("dependency: {}", dep),
+                        format!("dependency: {dep}"),
                         Style::default().fg(Color::Yellow),
                     ),
                 ]));
@@ -218,7 +219,10 @@ impl IncidentMode {
                 self.log.push(Line::from(vec![
                     Span::styled("  latency   ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("p99 {}ms  (baseline 40ms)", self.rng.random_range(800..4200u32)),
+                        format!(
+                            "p99 {}ms  (baseline 40ms)",
+                            self.rng.random_range(800..4200u32)
+                        ),
                         Style::default().fg(Color::Red),
                     ),
                 ]));
@@ -252,7 +256,7 @@ impl IncidentMode {
             1 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  applied   ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("to {}", service)),
+                    Span::raw(format!("to {service}")),
                 ]));
                 self.wait_ticks = self.rng.random_range(8..18);
                 self.progress = 0.65;
@@ -263,7 +267,7 @@ impl IncidentMode {
                 self.log.push(Line::from(vec![
                     Span::styled("  rate      ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("{} errors/min", reduced),
+                        format!("{reduced} errors/min"),
                         Style::default().fg(Color::Yellow),
                     ),
                     Span::styled("  ↓ dropping", Style::default().fg(Color::Green)),
@@ -310,25 +314,21 @@ impl IncidentMode {
             2 => {
                 let elapsed = self.started_at.elapsed().as_secs();
                 self.log.push(Line::raw(""));
-                self.log.push(Line::from(vec![
-                    Span::styled(
-                        format!(
-                            "  incident resolved  {}  TTR {}m{}s",
-                            service,
-                            elapsed / 60,
-                            elapsed % 60,
-                        ),
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
+                self.log.push(Line::from(vec![Span::styled(
+                    format!(
+                        "  incident resolved  {}  TTR {}m{}s",
+                        service,
+                        elapsed / 60,
+                        elapsed % 60,
                     ),
-                ]));
-                self.log.push(Line::from(vec![
-                    Span::styled(
-                        format!("  post-mortem  https://runbooks.internal/{}/postmortem", runbook_id),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )]));
+                self.log.push(Line::from(vec![Span::styled(
+                    format!("  post-mortem  https://runbooks.internal/{runbook_id}/postmortem"),
+                    Style::default().fg(Color::DarkGray),
+                )]));
                 self.progress = 1.0;
                 self.status = Status::Success;
                 self.wait_ticks = 0;
@@ -345,11 +345,11 @@ impl IncidentMode {
     fn advance_phase(&mut self) {
         self.phase = self.phase.next();
         self.phase_lines_remaining = match self.phase {
-            Phase::Detecting  => 4,
-            Phase::Triaging   => 5,
+            Phase::Detecting => 4,
+            Phase::Triaging => 5,
             Phase::Mitigating => 4,
-            Phase::Resolving  => 4,
-            Phase::Done       => 0,
+            Phase::Resolving => 4,
+            Phase::Done => 0,
         };
     }
 }
@@ -357,12 +357,20 @@ impl IncidentMode {
 static SUFFIXES: &[&str] = &["api", "worker", "gateway", "service", "backend"];
 static ERROR_CODES: &[u16] = &[500, 502, 503, 504];
 static METHODS: &[&str] = &[
-    "handleRequest", "fetchUpstream", "processPayload",
-    "validateAuth",  "routeRequest",  "forwardToQueue",
+    "handleRequest",
+    "fetchUpstream",
+    "processPayload",
+    "validateAuth",
+    "routeRequest",
+    "forwardToQueue",
 ];
 static DEPS: &[&str] = &[
-    "postgres-primary", "redis-cluster", "kafka-broker",
-    "payment-gateway",  "auth-service",  "object-storage",
+    "postgres-primary",
+    "redis-cluster",
+    "kafka-broker",
+    "payment-gateway",
+    "auth-service",
+    "object-storage",
 ];
 static MITIGATIONS: &[&str] = &[
     "rolling back to previous deployment",

@@ -31,5 +31,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
       - run: cargo build
       - run: cargo test

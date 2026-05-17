@@ -1,8 +1,8 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph},
-    Frame,
 };
 
 use crate::modes::{RenderState, Status};
@@ -13,9 +13,9 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(5),      // log panel
-            Constraint::Length(3),   // progress bar
-            Constraint::Length(1),   // status line
+            Constraint::Min(5),    // log panel
+            Constraint::Length(3), // progress bar
+            Constraint::Length(1), // status line
         ])
         .split(area);
 
@@ -23,7 +23,7 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
     let start = state.log_lines.len().saturating_sub(visible_height);
     let items: Vec<ListItem> = state.log_lines[start..]
         .iter()
-        .cloned() 
+        .cloned()
         .map(ListItem::new)
         .collect();
 
@@ -38,31 +38,32 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
     let (bar_color, bar_label) = match state.status {
         Status::Running => (Color::Cyan, format!("{:.0}%", state.progress * 100.0)),
         Status::Success => (Color::Green, "done".to_string()),
-        Status::Failed  => (Color::Red,   "failed".to_string()),
+        Status::Failed => (Color::Red, "failed".to_string()),
     };
 
     let gauge = Gauge::default()
-        .block(Block::default().borders(Borders::ALL).border_style(
-            Style::default().fg(Color::DarkGray),
-        ))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::DarkGray)),
+        )
         .gauge_style(Style::default().fg(bar_color).bg(Color::Black))
         .ratio(state.progress.clamp(0.0, 1.0))
         .label(bar_label);
     frame.render_widget(gauge, chunks[1]);
 
     let status_text = match state.status {
-        Status::Running => format!(
-            " running  {}s elapsed    q to quit",
-            state.elapsed_secs
-        ),
+        Status::Running => format!(" running  {}s elapsed    q to quit", state.elapsed_secs),
         Status::Success => " build succeeded — press any key to exit".to_string(),
-        Status::Failed  => " build failed — press any key to exit".to_string(),
+        Status::Failed => " build failed — press any key to exit".to_string(),
     };
 
     let status_style = match state.status {
         Status::Running => Style::default().fg(Color::DarkGray),
-        Status::Success => Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-        Status::Failed  => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        Status::Success => Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+        Status::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
     };
 
     let status_widget = Paragraph::new(status_text).style(status_style);

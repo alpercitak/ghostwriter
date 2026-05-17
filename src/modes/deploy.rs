@@ -7,25 +7,25 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use super::{hash_seed, RenderState, Status, Tick, TickResult};
+use super::{RenderState, Status, Tick, TickResult, hash_seed};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
-    Pulling,     // docker image pull
-    Starting,    // pod scheduling
-    Rolling,     // replica rollout with health checks
-    Verifying,   // readiness/liveness probes
+    Pulling,   // docker image pull
+    Starting,  // pod scheduling
+    Rolling,   // replica rollout with health checks
+    Verifying, // readiness/liveness probes
     Done,
 }
 
 impl Phase {
     fn next(self) -> Self {
         match self {
-            Phase::Pulling    => Phase::Starting,
-            Phase::Starting   => Phase::Rolling,
-            Phase::Rolling    => Phase::Verifying,
-            Phase::Verifying  => Phase::Done,
-            Phase::Done       => Phase::Done,
+            Phase::Pulling => Phase::Starting,
+            Phase::Starting => Phase::Rolling,
+            Phase::Rolling => Phase::Verifying,
+            Phase::Verifying => Phase::Done,
+            Phase::Done => Phase::Done,
         }
     }
 }
@@ -60,11 +60,7 @@ impl DeployMode {
             rng.random_range(0..99u8),
         );
         let namespace = NAMESPACES[rng.random_range(0..NAMESPACES.len())].to_string();
-        let deployment_name = format!(
-            "{}-{}",
-            seed,
-            SUFFIXES[rng.random_range(0..SUFFIXES.len())]
-        );
+        let deployment_name = format!("{}-{}", seed, SUFFIXES[rng.random_range(0..SUFFIXES.len())]);
         let total_replicas = rng.random_range(2..6u32);
 
         let mut s = Self {
@@ -87,7 +83,9 @@ impl DeployMode {
             Span::styled("  deployment  ", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 s.deployment_name.clone(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 format!("  namespace/{}", s.namespace),
@@ -113,11 +111,11 @@ impl Tick for DeployMode {
         }
 
         match self.phase {
-            Phase::Pulling   => self.tick_pulling(),
-            Phase::Starting  => self.tick_starting(),
-            Phase::Rolling   => self.tick_rolling(),
+            Phase::Pulling => self.tick_pulling(),
+            Phase::Starting => self.tick_starting(),
+            Phase::Rolling => self.tick_rolling(),
             Phase::Verifying => self.tick_verifying(),
-            Phase::Done      => {}
+            Phase::Done => {}
         }
 
         TickResult::Continue
@@ -141,7 +139,7 @@ impl DeployMode {
             0 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  Pulling  ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("image \"{}\"", image_tag)),
+                    Span::raw(format!("image \"{image_tag}\"")),
                 ]));
                 self.wait_ticks = self.rng.random_range(10..25);
             }
@@ -150,7 +148,7 @@ impl DeployMode {
                 self.log.push(Line::from(vec![
                     Span::styled("  Pulled   ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("sha256:{}", digest),
+                        format!("sha256:{digest}"),
                         Style::default().fg(Color::DarkGray),
                     ),
                 ]));
@@ -159,7 +157,7 @@ impl DeployMode {
             _ => {
                 self.log.push(Line::from(vec![
                     Span::styled("  Created  ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("container from image \"{}\"", image_tag)),
+                    Span::raw(format!("container from image \"{image_tag}\"")),
                 ]));
                 self.wait_ticks = self.rng.random_range(2..6);
                 self.progress = 0.15;
@@ -191,8 +189,7 @@ impl DeployMode {
                 self.log.push(Line::from(vec![
                     Span::styled("  Waiting  ", Style::default().fg(Color::Yellow)),
                     Span::raw(format!(
-                        "for rollout of deployment/{} in {}",
-                        deployment_name, namespace
+                        "for rollout of deployment/{deployment_name} in {namespace}"
                     )),
                 ]));
                 self.wait_ticks = self.rng.random_range(8..20);
@@ -226,9 +223,12 @@ impl DeployMode {
 
         self.log.push(Line::from(vec![
             Span::styled("  ●  ", Style::default().fg(Color::Cyan)),
-            Span::raw(format!("pod/{}", pod_name)),
+            Span::raw(format!("pod/{pod_name}")),
             if slow {
-                Span::styled("  waiting for readiness…", Style::default().fg(Color::Yellow))
+                Span::styled(
+                    "  waiting for readiness…",
+                    Style::default().fg(Color::Yellow),
+                )
             } else {
                 Span::styled("  Running", Style::default().fg(Color::Green))
             },
@@ -255,7 +255,7 @@ impl DeployMode {
             0 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  Probing  ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("liveness on deployment/{}", deployment_name)),
+                    Span::raw(format!("liveness on deployment/{deployment_name}")),
                 ]));
                 self.wait_ticks = self.rng.random_range(10..20);
                 self.progress = 0.82;
@@ -263,7 +263,7 @@ impl DeployMode {
             1 => {
                 self.log.push(Line::from(vec![
                     Span::styled("  Probing  ", Style::default().fg(Color::DarkGray)),
-                    Span::raw(format!("readiness on deployment/{}", deployment_name)),
+                    Span::raw(format!("readiness on deployment/{deployment_name}")),
                 ]));
                 self.wait_ticks = self.rng.random_range(8..18);
                 self.progress = 0.91;
@@ -271,17 +271,14 @@ impl DeployMode {
             _ => {
                 let elapsed = self.started_at.elapsed().as_secs_f64();
                 self.log.push(Line::raw(""));
-                self.log.push(Line::from(vec![
-                    Span::styled(
-                        format!(
-                            "  deployment/{} successfully rolled out  ({:.0}s)",
-                            deployment_name, elapsed,
-                        ),
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
+                self.log.push(Line::from(vec![Span::styled(
+                    format!(
+                        "  deployment/{deployment_name} successfully rolled out  ({elapsed:.0}s)",
                     ),
-                ]));
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )]));
                 self.progress = 1.0;
                 self.status = Status::Success;
                 self.wait_ticks = self.rng.random_range(4..10);
@@ -297,17 +294,19 @@ impl DeployMode {
     fn advance_phase(&mut self) {
         self.phase = self.phase.next();
         self.phase_lines_remaining = match self.phase {
-            Phase::Pulling    => 3,
-            Phase::Starting   => 3,
-            Phase::Rolling    => self.total_replicas,
-            Phase::Verifying  => 3,
-            Phase::Done       => 0,
+            Phase::Pulling => 3,
+            Phase::Starting => 3,
+            Phase::Rolling => self.total_replicas,
+            Phase::Verifying => 3,
+            Phase::Done => 0,
         };
     }
 }
 
 fn random_sha(rng: &mut ChaCha8Rng, len: usize) -> String {
-    (0..len).map(|_| format!("{:02x}", rng.random::<u8>())).collect()
+    (0..len)
+        .map(|_| format!("{:02x}", rng.random::<u8>()))
+        .collect()
 }
 
 fn random_hex(rng: &mut ChaCha8Rng, len: usize) -> String {
@@ -320,4 +319,11 @@ fn random_hex(rng: &mut ChaCha8Rng, len: usize) -> String {
 }
 
 static NAMESPACES: &[&str] = &["production", "staging", "default", "platform", "infra"];
-static SUFFIXES: &[&str] = &["api", "worker", "gateway", "service", "backend", "scheduler"];
+static SUFFIXES: &[&str] = &[
+    "api",
+    "worker",
+    "gateway",
+    "service",
+    "backend",
+    "scheduler",
+];

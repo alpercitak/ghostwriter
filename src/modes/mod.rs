@@ -3,9 +3,7 @@ pub mod deploy;
 pub mod incident;
 pub mod review;
 
-use ratatui::{
-    text::{Line},
-};
+use ratatui::text::Line;
 
 pub enum TickResult {
     Continue,

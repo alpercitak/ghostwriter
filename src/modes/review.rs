@@ -7,7 +7,7 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use super::{hash_seed, RenderState, Status, Tick, TickResult};
+use super::{RenderState, Status, Tick, TickResult, hash_seed};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
@@ -21,11 +21,11 @@ enum Phase {
 impl Phase {
     fn next(self) -> Self {
         match self {
-            Phase::Linting   => Phase::Testing,
-            Phase::Testing   => Phase::Coverage,
-            Phase::Coverage  => Phase::Approving,
+            Phase::Linting => Phase::Testing,
+            Phase::Testing => Phase::Coverage,
+            Phase::Coverage => Phase::Approving,
             Phase::Approving => Phase::Done,
-            Phase::Done      => Phase::Done,
+            Phase::Done => Phase::Done,
         }
     }
 }
@@ -89,7 +89,9 @@ impl ReviewMode {
             Span::styled("  PR #", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 s.pr_number.to_string(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled("  ", Style::default()),
             Span::raw(s.branch.clone()),
@@ -116,11 +118,11 @@ impl Tick for ReviewMode {
         }
 
         match self.phase {
-            Phase::Linting   => self.tick_linting(),
-            Phase::Testing   => self.tick_testing(),
-            Phase::Coverage  => self.tick_coverage(),
+            Phase::Linting => self.tick_linting(),
+            Phase::Testing => self.tick_testing(),
+            Phase::Coverage => self.tick_coverage(),
             Phase::Approving => self.tick_approving(),
-            Phase::Done      => {}
+            Phase::Done => {}
         }
 
         TickResult::Continue
@@ -156,7 +158,7 @@ impl ReviewMode {
                     let rule = LINT_RULES[self.rng.random_range(0..LINT_RULES.len())];
                     self.log.push(Line::from(vec![
                         Span::styled(
-                            format!("  warn  {}:{} ", file, line),
+                            format!("  warn  {file}:{line} "),
                             Style::default().fg(Color::Yellow),
                         ),
                         Span::styled(rule, Style::default().fg(Color::DarkGray)),
@@ -209,7 +211,7 @@ impl ReviewMode {
 
         // flaky test: first attempt fails, retry succeeds
         let flaky = !self.retrying && self.rng.random_bool(0.06);
-        let fail  = flaky || self.rng.random_bool(0.02);
+        let fail = flaky || self.rng.random_bool(0.02);
 
         let test_name = random_test_name(&mut self.rng);
 
@@ -274,16 +276,20 @@ impl ReviewMode {
                 self.wait_ticks = self.rng.random_range(8..18);
                 self.progress = 0.60;
             }
-            1 | 2 | 3 => {
+            1..=3 => {
                 let file = random_src_file(&mut self.rng);
                 let pct = self.rng.random_range(62..100u32);
-                let color = if pct >= 80 { Color::Green } else { Color::Yellow };
+                let color = if pct >= 80 {
+                    Color::Green
+                } else {
+                    Color::Yellow
+                };
                 self.log.push(Line::from(vec![
                     Span::styled(
-                        format!("  {:<38} ", file),
+                        format!("  {file:<38} "),
                         Style::default().fg(Color::DarkGray),
                     ),
-                    Span::styled(format!("{:>3}%", pct), Style::default().fg(color)),
+                    Span::styled(format!("{pct:>3}%"), Style::default().fg(color)),
                 ]));
                 self.wait_ticks = self.rng.random_range(3..8);
                 self.progress = 0.63 + ((4 - self.phase_lines_remaining) as f64 / 5.0) * 0.12;
@@ -291,9 +297,12 @@ impl ReviewMode {
             _ => {
                 let total_pct = self.rng.random_range(74..93u32);
                 self.log.push(Line::from(vec![
-                    Span::styled("  total                                 ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("{:>3}%", total_pct),
+                        "  total                                 ",
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled(
+                        format!("{total_pct:>3}%"),
                         Style::default()
                             .fg(Color::Green)
                             .add_modifier(Modifier::BOLD),
@@ -318,10 +327,7 @@ impl ReviewMode {
                 let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
                 self.log.push(Line::from(vec![
                     Span::styled("  review   ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        format!("@{}", reviewer),
-                        Style::default().fg(Color::Cyan),
-                    ),
+                    Span::styled(format!("@{reviewer}"), Style::default().fg(Color::Cyan)),
                     Span::styled(" requested", Style::default().fg(Color::DarkGray)),
                 ]));
                 self.wait_ticks = self.rng.random_range(20..45);
@@ -331,10 +337,7 @@ impl ReviewMode {
                 let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
                 let comment = REVIEW_COMMENTS[self.rng.random_range(0..REVIEW_COMMENTS.len())];
                 self.log.push(Line::from(vec![
-                    Span::styled(
-                        format!("  @{}  ", reviewer),
-                        Style::default().fg(Color::Cyan),
-                    ),
+                    Span::styled(format!("  @{reviewer}  "), Style::default().fg(Color::Cyan)),
                     Span::styled(comment, Style::default().fg(Color::DarkGray)),
                 ]));
                 self.wait_ticks = self.rng.random_range(10..22);
@@ -344,24 +347,19 @@ impl ReviewMode {
                 let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
                 self.log.push(Line::from(vec![
                     Span::styled("  ✔ approved  ", Style::default().fg(Color::Green)),
-                    Span::styled(
-                        format!("@{}", reviewer),
-                        Style::default().fg(Color::Cyan),
-                    ),
+                    Span::styled(format!("@{reviewer}"), Style::default().fg(Color::Cyan)),
                 ]));
                 self.wait_ticks = self.rng.random_range(6..14);
                 self.progress = 0.95;
             }
             _ => {
                 self.log.push(Line::raw(""));
-                self.log.push(Line::from(vec![
-                    Span::styled(
-                        format!("  PR #{} merged  ✔  all checks passed", pr),
-                        Style::default()
-                            .fg(Color::Green)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ]));
+                self.log.push(Line::from(vec![Span::styled(
+                    format!("  PR #{pr} merged  ✔  all checks passed"),
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )]));
                 self.progress = 1.0;
                 self.status = Status::Success;
                 self.wait_ticks = 0;
@@ -377,11 +375,11 @@ impl ReviewMode {
     fn advance_phase(&mut self) {
         self.phase = self.phase.next();
         self.phase_lines_remaining = match self.phase {
-            Phase::Linting   => 5,
-            Phase::Testing   => self.total_tests,
-            Phase::Coverage  => 5,
+            Phase::Linting => 5,
+            Phase::Testing => self.total_tests,
+            Phase::Coverage => 5,
             Phase::Approving => 4,
-            Phase::Done      => 0,
+            Phase::Done => 0,
         };
     }
 }
@@ -391,8 +389,16 @@ impl ReviewMode {
 fn random_src_file(rng: &mut ChaCha8Rng) -> String {
     static DIRS: &[&str] = &["components", "hooks", "utils", "services", "lib", "pages"];
     static FILES: &[&str] = &[
-        "index", "api", "auth", "helpers", "types",
-        "config", "store", "reducer", "middleware", "router",
+        "index",
+        "api",
+        "auth",
+        "helpers",
+        "types",
+        "config",
+        "store",
+        "reducer",
+        "middleware",
+        "router",
     ];
     static EXTS: &[&str] = &[".ts", ".tsx", ".js"];
     format!(
@@ -405,8 +411,14 @@ fn random_src_file(rng: &mut ChaCha8Rng) -> String {
 
 fn random_test_name(rng: &mut ChaCha8Rng) -> String {
     static SUBJECTS: &[&str] = &[
-        "AuthService", "UserStore", "ApiClient", "PaymentFlow",
-        "SessionManager", "RouteGuard", "DataMapper", "EventBus",
+        "AuthService",
+        "UserStore",
+        "ApiClient",
+        "PaymentFlow",
+        "SessionManager",
+        "RouteGuard",
+        "DataMapper",
+        "EventBus",
     ];
     static PREDICATES: &[&str] = &[
         "should return 401 on expired token",
@@ -427,12 +439,13 @@ fn random_test_name(rng: &mut ChaCha8Rng) -> String {
 
 static BRANCH_PREFIXES: &[&str] = &["feat", "fix", "chore", "refactor", "perf"];
 static LINT_RULES: &[&str] = &[
-    "no-unused-vars", "@typescript-eslint/no-explicit-any",
-    "react-hooks/exhaustive-deps", "no-console", "prefer-const",
+    "no-unused-vars",
+    "@typescript-eslint/no-explicit-any",
+    "react-hooks/exhaustive-deps",
+    "no-console",
+    "prefer-const",
 ];
-static REVIEWERS: &[&str] = &[
-    "sarah_k", "mvanderberg", "tpham", "alex_j", "rbauer",
-];
+static REVIEWERS: &[&str] = &["sarah_k", "mvanderberg", "tpham", "alex_j", "rbauer"];
 static REVIEW_COMMENTS: &[&str] = &[
     "looks good, minor nit on error handling",
     "LGTM — left one optional suggestion",
