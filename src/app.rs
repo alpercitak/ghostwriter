@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{Terminal, backend::Backend};
 
 use crate::{
@@ -83,8 +83,7 @@ impl App {
                 if remaining.is_zero() {
                     break;
                 }
-                if event::poll(remaining)?
-                    && let Event::Key(key) = event::read()?
+                if let Some(key) = poll_key_press(remaining)?
                     && (finished || is_quit(key))
                 {
                     return Ok(());
@@ -96,9 +95,7 @@ impl App {
                 TickResult::Done => {
                     terminal.draw(|frame| ui::render(frame, mode.state()))?;
                     loop {
-                        if event::poll(Duration::from_millis(200))?
-                            && let Event::Key(_) = event::read()?
-                        {
+                        if poll_key_press(Duration::from_millis(200))?.is_some() {
                             break;
                         }
                     }
@@ -109,6 +106,18 @@ impl App {
 
         Ok(())
     }
+}
+
+/// Wait up to `timeout` for an event and return it if it is a key press.
+/// Windows also reports key releases (and repeats); only presses count.
+fn poll_key_press(timeout: Duration) -> std::io::Result<Option<KeyEvent>> {
+    if event::poll(timeout)?
+        && let Event::Key(key) = event::read()?
+        && key.kind == KeyEventKind::Press
+    {
+        return Ok(Some(key));
+    }
+    Ok(None)
 }
 
 /// `q`, `Esc`, or Ctrl+C. Raw mode delivers Ctrl+C as a key event rather
