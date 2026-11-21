@@ -182,7 +182,7 @@ impl BuildMode {
         self.sim.wait_ticks = self.sim.rng.random_range(4..12);
 
         if self.sim.next_step(4) {
-            let elapsed = self.sim.started_at.elapsed().as_secs_f64();
+            let elapsed = self.sim.elapsed().as_secs_f64();
             self.sim.log.push(Line::raw(""));
             self.sim.log.push(Line::from(vec![Span::styled(
                 format!("webpack compiled successfully in {:.0}ms", elapsed * 1000.0),

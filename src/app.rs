@@ -6,13 +6,11 @@ use ratatui::{Terminal, backend::Backend};
 use crate::{
     Mode,
     modes::{
-        Status, Tick, TickResult, build::BuildMode, deploy::DeployMode, incident::IncidentMode,
-        review::ReviewMode,
+        Status, TICK, Tick, TickResult, build::BuildMode, deploy::DeployMode,
+        incident::IncidentMode, review::ReviewMode,
     },
     ui,
 };
-
-const BASE_TICK: Duration = Duration::from_millis(100);
 
 pub struct App {
     mode: Mode,
@@ -68,7 +66,7 @@ impl App {
     {
         // One tick = one step of the simulation; all pacing lives here so
         // `--speed` scales the whole playback uniformly.
-        let tick = BASE_TICK.div_f32(speed.max(0.1));
+        let tick = TICK.div_f32(speed.max(0.1));
 
         loop {
             terminal.draw(|frame| {

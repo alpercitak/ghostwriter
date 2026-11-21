@@ -236,7 +236,7 @@ impl DeployMode {
                 self.sim.progress = 0.91;
             }
             _ => {
-                let elapsed = self.sim.started_at.elapsed().as_secs_f64();
+                let elapsed = self.sim.elapsed().as_secs_f64();
                 self.sim.log.push(Line::raw(""));
                 self.sim.log.push(Line::from(vec![Span::styled(
                     format!(

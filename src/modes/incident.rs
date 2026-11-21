@@ -279,7 +279,7 @@ impl IncidentMode {
                 self.sim.progress = 0.93;
             }
             2 => {
-                let elapsed = self.sim.started_at.elapsed().as_secs();
+                let elapsed = self.sim.elapsed().as_secs();
                 self.sim.log.push(Line::raw(""));
                 self.sim.log.push(Line::from(vec![Span::styled(
                     format!(

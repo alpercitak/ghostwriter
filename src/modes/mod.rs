@@ -3,7 +3,7 @@ pub mod deploy;
 pub mod incident;
 pub mod review;
 
-use std::time::Instant;
+use std::time::Duration;
 
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -30,6 +30,10 @@ pub enum Status {
     Success,
 }
 
+/// Simulated time per tick at 1x speed. Playback speed only changes how fast
+/// ticks are played, so simulated timings stay identical for a given seed.
+pub const TICK: Duration = Duration::from_millis(100);
+
 fn hash_seed(s: &str) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     for b in s.bytes() {
@@ -45,7 +49,8 @@ pub struct Sim {
     pub log: Vec<Line<'static>>,
     pub progress: f64,
     pub status: Status,
-    pub started_at: Instant,
+    /// Ticks elapsed since the start, including idle ones.
+    pub ticks: u32,
     /// Ticks to idle before the next step runs.
     pub wait_ticks: u32,
     /// Index of the current step within the current phase.
@@ -59,10 +64,15 @@ impl Sim {
             log: Vec::new(),
             progress: 0.0,
             status: Status::Running,
-            started_at: Instant::now(),
+            ticks: 0,
             wait_ticks: 0,
             step: 0,
         }
+    }
+
+    /// Simulated time since the start, independent of playback speed.
+    pub fn elapsed(&self) -> Duration {
+        TICK * self.ticks
     }
 
     /// Finish the current step. Returns true (and resets the step counter)
@@ -96,6 +106,7 @@ pub trait Tick {
             return TickResult::Done;
         }
         let sim = self.sim_mut();
+        sim.ticks += 1;
         if sim.wait_ticks > 0 {
             sim.wait_ticks -= 1;
             return TickResult::Continue;
@@ -112,7 +123,7 @@ pub trait Tick {
             log_lines: &sim.log,
             progress: sim.progress,
             status: sim.status,
-            elapsed_secs: sim.started_at.elapsed().as_secs(),
+            elapsed_secs: sim.elapsed().as_secs(),
         }
     }
 }
@@ -141,15 +152,7 @@ mod tests {
                 return state
                     .log_lines
                     .iter()
-                    .map(|line| {
-                        let text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
-                        // Build mode reports real wall-clock milliseconds here.
-                        if text.contains("compiled successfully in") {
-                            text.replace(|c: char| c.is_ascii_digit(), "#")
-                        } else {
-                            text
-                        }
-                    })
+                    .map(|line| line.spans.iter().map(|s| s.content.as_ref()).collect())
                     .collect();
             }
         }
