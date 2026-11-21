@@ -1,6 +1,3 @@
-use std::time::Instant;
-
-use rand::SeedableRng;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 
@@ -9,7 +6,7 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use super::{RenderState, Status, Tick, TickResult, hash_seed};
+use super::{Sim, Status, Tick};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
@@ -20,101 +17,66 @@ enum Phase {
     Done,
 }
 
-impl Phase {
-    fn next(self) -> Self {
-        match self {
-            Phase::Resolving => Phase::Compiling,
-            Phase::Compiling => Phase::Optimizing,
-            Phase::Optimizing => Phase::Emitting,
-            Phase::Emitting => Phase::Done,
-            Phase::Done => Phase::Done,
-        }
-    }
-}
-
 pub struct BuildMode {
-    rng: ChaCha8Rng,
-
-    log: Vec<Line<'static>>,
+    sim: Sim,
     phase: Phase,
-    progress: f64,
-    status: Status,
-    started_at: Instant,
-
-    phase_lines_remaining: u32,
 
     total_modules: u32,
     compiled_modules: u32,
-
-    wait_ticks: u32,
 }
 
 impl BuildMode {
     pub fn new(seed: &str) -> Self {
-        let seed_u64 = hash_seed(seed);
-        let mut rng = ChaCha8Rng::seed_from_u64(seed_u64);
+        let mut sim = Sim::new(seed);
 
-        let total_modules = rng.random_range(180..420u32);
+        let total_modules = sim.rng.random_range(180..420u32);
 
         let mut s = Self {
-            rng,
-            log: Vec::new(),
+            sim,
             phase: Phase::Resolving,
-            progress: 0.0,
-            status: Status::Running,
-            started_at: Instant::now(),
-            phase_lines_remaining: 3,
             total_modules,
             compiled_modules: 0,
-            wait_ticks: 0,
         };
 
-        s.log.push(Line::from(vec![Span::styled(
+        s.sim.log.push(Line::from(vec![Span::styled(
             format!(
                 "webpack {}.{}.{} — building in production mode",
-                s.rng.random_range(4..6u8),
-                s.rng.random_range(0..9u8),
-                s.rng.random_range(0..20u8)
+                s.sim.rng.random_range(4..6u8),
+                s.sim.rng.random_range(0..9u8),
+                s.sim.rng.random_range(0..20u8)
             ),
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         )]));
-        s.log.push(Line::raw(""));
+        s.sim.log.push(Line::raw(""));
         s
     }
 }
 
 impl Tick for BuildMode {
-    fn tick(&mut self) -> TickResult {
-        if self.phase == Phase::Done {
-            return TickResult::Done;
-        }
+    const TITLE: &'static str = "webpack build";
+    const SUCCESS_MESSAGE: &'static str = "build succeeded";
 
-        if self.wait_ticks > 0 {
-            self.wait_ticks -= 1;
-            return TickResult::Continue;
-        }
+    fn sim(&self) -> &Sim {
+        &self.sim
+    }
 
+    fn sim_mut(&mut self) -> &mut Sim {
+        &mut self.sim
+    }
+
+    fn is_done(&self) -> bool {
+        self.phase == Phase::Done
+    }
+
+    fn step(&mut self) {
         match self.phase {
             Phase::Resolving => self.tick_resolving(),
             Phase::Compiling => self.tick_compiling(),
             Phase::Optimizing => self.tick_optimizing(),
             Phase::Emitting => self.tick_emitting(),
             Phase::Done => {}
-        }
-
-        TickResult::Continue
-    }
-
-    fn state(&self) -> RenderState<'_> {
-        RenderState {
-            title: "webpack build",
-            success_message: "build succeeded",
-            log_lines: &self.log,
-            progress: self.progress,
-            status: self.status,
-            elapsed_secs: self.started_at.elapsed().as_secs(),
         }
     }
 }
@@ -126,22 +88,22 @@ impl BuildMode {
             "resolving ./node_modules",
             "resolved dependency graph",
         ];
-        let idx = (3 - self.phase_lines_remaining) as usize;
-        self.log
+        let idx = self.sim.step as usize;
+        self.sim
+            .log
             .push(Line::raw(format!("  {}", lines[idx.min(lines.len() - 1)])));
-        self.wait_ticks = self.rng.random_range(2..8);
+        self.sim.wait_ticks = self.sim.rng.random_range(2..8);
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.log.push(Line::raw(""));
-            self.advance_phase();
+        if self.sim.next_step(3) {
+            self.sim.log.push(Line::raw(""));
+            self.phase = Phase::Compiling;
         }
     }
 
     fn tick_compiling(&mut self) {
-        let module = random_module_path(&mut self.rng);
-        let bytes = self.rng.random_range(512..98_000u32);
-        self.log.push(Line::from(vec![
+        let module = random_module_path(&mut self.sim.rng);
+        let bytes = self.sim.rng.random_range(512..98_000u32);
+        self.sim.log.push(Line::from(vec![
             Span::styled(
                 format!(
                     "  [{:>3}/{:>3}] ",
@@ -155,26 +117,27 @@ impl BuildMode {
         ]));
 
         self.compiled_modules += 1;
-        self.progress = self.compiled_modules as f64 / self.total_modules as f64 * 0.7;
+        self.sim.progress = self.compiled_modules as f64 / self.total_modules as f64 * 0.7;
 
-        if self.rng.random_bool(0.04) {
-            self.log.push(Line::from(vec![
+        if self.sim.rng.random_bool(0.04) {
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ⚠ WARNING ", Style::default().fg(Color::Yellow)),
                 Span::raw(format!("in {module}")),
             ]));
-            self.log
+            self.sim
+                .log
                 .push(Line::raw("    Module not found, but mocked by externals"));
         }
 
-        self.wait_ticks = if self.rng.random_bool(0.05) {
-            self.rng.random_range(8..20)
+        self.sim.wait_ticks = if self.sim.rng.random_bool(0.05) {
+            self.sim.rng.random_range(8..20)
         } else {
-            self.rng.random_range(0..3)
+            self.sim.rng.random_range(0..3)
         };
 
         if self.compiled_modules >= self.total_modules {
-            self.log.push(Line::raw(""));
-            self.advance_phase();
+            self.sim.log.push(Line::raw(""));
+            self.phase = Phase::Optimizing;
         }
     }
 
@@ -186,18 +149,17 @@ impl BuildMode {
             "asset optimization…",
             "minifying…",
         ];
-        let idx = (5 - self.phase_lines_remaining) as usize;
-        self.log.push(Line::from(vec![
+        let idx = self.sim.step as usize;
+        self.sim.log.push(Line::from(vec![
             Span::styled("  ▶ ", Style::default().fg(Color::Magenta)),
             Span::raw(steps[idx.min(steps.len() - 1)]),
         ]));
-        self.progress = 0.7 + (idx as f64 / 5.0) * 0.2;
-        self.wait_ticks = self.rng.random_range(12..40);
+        self.sim.progress = 0.7 + (idx as f64 / 5.0) * 0.2;
+        self.sim.wait_ticks = self.sim.rng.random_range(12..40);
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.log.push(Line::raw(""));
-            self.advance_phase();
+        if self.sim.next_step(5) {
+            self.sim.log.push(Line::raw(""));
+            self.phase = Phase::Emitting;
         }
     }
 
@@ -208,42 +170,30 @@ impl BuildMode {
             ("./dist/main.css", 42, 180),
             ("./dist/runtime.js", 8, 32),
         ];
-        let idx = (4 - self.phase_lines_remaining) as usize;
+        let idx = self.sim.step as usize;
         if let Some(&(name, lo, hi)) = assets.get(idx) {
-            let size = self.rng.random_range(lo..hi);
-            self.log.push(Line::from(vec![
+            let size = self.sim.rng.random_range(lo..hi);
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ✔ ", Style::default().fg(Color::Green)),
                 Span::raw(format!("{name:<40} {size:>8} KiB")),
             ]));
         }
-        self.progress = 0.9 + (idx as f64 / 4.0) * 0.1;
-        self.wait_ticks = self.rng.random_range(4..12);
+        self.sim.progress = 0.9 + (idx as f64 / 4.0) * 0.1;
+        self.sim.wait_ticks = self.sim.rng.random_range(4..12);
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            let elapsed = self.started_at.elapsed().as_secs_f64();
-            self.log.push(Line::raw(""));
-            self.log.push(Line::from(vec![Span::styled(
+        if self.sim.next_step(4) {
+            let elapsed = self.sim.started_at.elapsed().as_secs_f64();
+            self.sim.log.push(Line::raw(""));
+            self.sim.log.push(Line::from(vec![Span::styled(
                 format!("webpack compiled successfully in {:.0}ms", elapsed * 1000.0),
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::BOLD),
             )]));
-            self.progress = 1.0;
-            self.status = Status::Success;
-            self.advance_phase();
+            self.sim.progress = 1.0;
+            self.sim.status = Status::Success;
+            self.phase = Phase::Done;
         }
-    }
-
-    fn advance_phase(&mut self) {
-        self.phase = self.phase.next();
-        self.phase_lines_remaining = match self.phase {
-            Phase::Resolving => 3,
-            Phase::Compiling => self.total_modules,
-            Phase::Optimizing => 5,
-            Phase::Emitting => 4,
-            Phase::Done => 0,
-        };
     }
 }
 

@@ -1,13 +1,10 @@
-use std::time::Instant;
-
 use rand::prelude::*;
-use rand_chacha::ChaCha8Rng;
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
 };
 
-use super::{RenderState, Status, Tick, TickResult, hash_seed};
+use super::{Sim, Status, Tick};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
@@ -18,27 +15,9 @@ enum Phase {
     Done,
 }
 
-impl Phase {
-    fn next(self) -> Self {
-        match self {
-            Phase::Detecting => Phase::Triaging,
-            Phase::Triaging => Phase::Mitigating,
-            Phase::Mitigating => Phase::Resolving,
-            Phase::Resolving => Phase::Done,
-            Phase::Done => Phase::Done,
-        }
-    }
-}
-
 pub struct IncidentMode {
-    rng: ChaCha8Rng,
-    log: Vec<Line<'static>>,
+    sim: Sim,
     phase: Phase,
-    progress: f64,
-    status: Status,
-    started_at: Instant,
-    wait_ticks: u32,
-    phase_lines_remaining: u32,
 
     service: String,
     error_code: u16,
@@ -48,22 +27,20 @@ pub struct IncidentMode {
 
 impl IncidentMode {
     pub fn new(seed: &str) -> Self {
-        let mut rng = ChaCha8Rng::seed_from_u64(hash_seed(seed));
+        let mut sim = Sim::new(seed);
 
-        let service = format!("{}-{}", seed, SUFFIXES[rng.random_range(0..SUFFIXES.len())]);
-        let error_code = ERROR_CODES[rng.random_range(0..ERROR_CODES.len())];
-        let error_rate_start = rng.random_range(120..980u32);
-        let runbook_id = format!("RB-{}", rng.random_range(1000..9999u32));
+        let service = format!(
+            "{}-{}",
+            seed,
+            SUFFIXES[sim.rng.random_range(0..SUFFIXES.len())]
+        );
+        let error_code = ERROR_CODES[sim.rng.random_range(0..ERROR_CODES.len())];
+        let error_rate_start = sim.rng.random_range(120..980u32);
+        let runbook_id = format!("RB-{}", sim.rng.random_range(1000..9999u32));
 
         let mut s = Self {
-            rng,
-            log: Vec::new(),
+            sim,
             phase: Phase::Detecting,
-            progress: 0.0,
-            status: Status::Running,
-            started_at: Instant::now(),
-            wait_ticks: 0,
-            phase_lines_remaining: 4,
             service,
             error_code,
             error_rate_start,
@@ -71,7 +48,7 @@ impl IncidentMode {
         };
 
         // opening alert line — red, loud
-        s.log.push(Line::from(vec![
+        s.sim.log.push(Line::from(vec![
             Span::styled(
                 "  ✖ ALERT  ",
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
@@ -81,41 +58,34 @@ impl IncidentMode {
                 Style::default().fg(Color::Red),
             ),
         ]));
-        s.log.push(Line::raw(""));
+        s.sim.log.push(Line::raw(""));
         s
     }
 }
 
 impl Tick for IncidentMode {
-    fn tick(&mut self) -> TickResult {
-        if self.phase == Phase::Done {
-            return TickResult::Done;
-        }
+    const TITLE: &'static str = "incident response";
+    const SUCCESS_MESSAGE: &'static str = "incident resolved";
 
-        if self.wait_ticks > 0 {
-            self.wait_ticks -= 1;
-            return TickResult::Continue;
-        }
+    fn sim(&self) -> &Sim {
+        &self.sim
+    }
 
+    fn sim_mut(&mut self) -> &mut Sim {
+        &mut self.sim
+    }
+
+    fn is_done(&self) -> bool {
+        self.phase == Phase::Done
+    }
+
+    fn step(&mut self) {
         match self.phase {
             Phase::Detecting => self.tick_detecting(),
             Phase::Triaging => self.tick_triaging(),
             Phase::Mitigating => self.tick_mitigating(),
             Phase::Resolving => self.tick_resolving(),
             Phase::Done => {}
-        }
-
-        TickResult::Continue
-    }
-
-    fn state(&self) -> RenderState<'_> {
-        RenderState {
-            title: "incident response",
-            success_message: "incident resolved",
-            log_lines: &self.log,
-            progress: self.progress,
-            status: self.status,
-            elapsed_secs: self.started_at.elapsed().as_secs(),
         }
     }
 }
@@ -124,9 +94,9 @@ impl IncidentMode {
     fn tick_detecting(&mut self) {
         let service = self.service.clone();
         let runbook_id = self.runbook_id.clone();
-        match 4 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  severity  ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         "SEV-2",
@@ -139,17 +109,17 @@ impl IncidentMode {
                         Style::default().fg(Color::DarkGray),
                     ),
                 ]));
-                self.wait_ticks = self.rng.random_range(6..14);
+                self.sim.wait_ticks = self.sim.rng.random_range(6..14);
             }
             1 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  runbook   ", Style::default().fg(Color::DarkGray)),
                     Span::raw(format!("https://runbooks.internal/{runbook_id}")),
                 ]));
-                self.wait_ticks = self.rng.random_range(4..10);
+                self.sim.wait_ticks = self.sim.rng.random_range(4..10);
             }
             2 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  rate      ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{} errors/min", self.error_rate_start),
@@ -160,111 +130,109 @@ impl IncidentMode {
                         Style::default().fg(Color::DarkGray),
                     ),
                 ]));
-                self.wait_ticks = self.rng.random_range(8..18);
-                self.progress = 0.1;
+                self.sim.wait_ticks = self.sim.rng.random_range(8..18);
+                self.sim.progress = 0.1;
             }
             _ => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  affects   ", Style::default().fg(Color::DarkGray)),
                     Span::raw(service.to_string()),
                 ]));
-                self.log.push(Line::raw(""));
-                self.wait_ticks = self.rng.random_range(4..8);
-                self.progress = 0.15;
+                self.sim.log.push(Line::raw(""));
+                self.sim.wait_ticks = self.sim.rng.random_range(4..8);
+                self.sim.progress = 0.15;
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(4) {
+            self.phase = Phase::Triaging;
         }
     }
 
     fn tick_triaging(&mut self) {
         let service = self.service.clone();
-        match 5 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ▶ triage  ", Style::default().fg(Color::Magenta)),
                     Span::raw(format!("pulling logs for {service}")),
                 ]));
-                self.wait_ticks = self.rng.random_range(10..22);
-                self.progress = 0.22;
+                self.sim.wait_ticks = self.sim.rng.random_range(10..22);
+                self.sim.progress = 0.22;
             }
             1 => {
                 // fake a stack trace excerpt
-                self.log.push(Line::from(Span::styled(
+                self.sim.log.push(Line::from(Span::styled(
                     format!(
                         "    Error: upstream timeout in {}::{}",
                         service,
-                        METHODS[self.rng.random_range(0..METHODS.len())]
+                        METHODS[self.sim.rng.random_range(0..METHODS.len())]
                     ),
                     Style::default().fg(Color::Red),
                 )));
-                self.wait_ticks = self.rng.random_range(4..10);
+                self.sim.wait_ticks = self.sim.rng.random_range(4..10);
             }
             2 => {
-                let dep = DEPS[self.rng.random_range(0..DEPS.len())];
-                self.log.push(Line::from(vec![
+                let dep = DEPS[self.sim.rng.random_range(0..DEPS.len())];
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  source    ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("dependency: {dep}"),
                         Style::default().fg(Color::Yellow),
                     ),
                 ]));
-                self.wait_ticks = self.rng.random_range(8..16);
-                self.progress = 0.38;
+                self.sim.wait_ticks = self.sim.rng.random_range(8..16);
+                self.sim.progress = 0.38;
             }
             3 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  latency   ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!(
                             "p99 {}ms  (baseline 40ms)",
-                            self.rng.random_range(800..4200u32)
+                            self.sim.rng.random_range(800..4200u32)
                         ),
                         Style::default().fg(Color::Red),
                     ),
                 ]));
-                self.wait_ticks = self.rng.random_range(6..12);
-                self.progress = 0.44;
+                self.sim.wait_ticks = self.sim.rng.random_range(6..12);
+                self.sim.progress = 0.44;
             }
             _ => {
-                self.log.push(Line::raw(""));
-                self.wait_ticks = self.rng.random_range(2..6);
+                self.sim.log.push(Line::raw(""));
+                self.sim.wait_ticks = self.sim.rng.random_range(2..6);
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(5) {
+            self.phase = Phase::Mitigating;
         }
     }
 
     fn tick_mitigating(&mut self) {
         let service = self.service.clone();
-        match 4 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                let action = MITIGATIONS[self.rng.random_range(0..MITIGATIONS.len())];
-                self.log.push(Line::from(vec![
+                let action = MITIGATIONS[self.sim.rng.random_range(0..MITIGATIONS.len())];
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ▶ action  ", Style::default().fg(Color::Magenta)),
                     Span::raw(action),
                 ]));
-                self.wait_ticks = self.rng.random_range(14..30);
-                self.progress = 0.55;
+                self.sim.wait_ticks = self.sim.rng.random_range(14..30);
+                self.sim.progress = 0.55;
             }
             1 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  applied   ", Style::default().fg(Color::DarkGray)),
                     Span::raw(format!("to {service}")),
                 ]));
-                self.wait_ticks = self.rng.random_range(8..18);
-                self.progress = 0.65;
+                self.sim.wait_ticks = self.sim.rng.random_range(8..18);
+                self.sim.progress = 0.65;
             }
             2 => {
                 // error rate dropping
-                let reduced = self.error_rate_start / self.rng.random_range(4..10);
-                self.log.push(Line::from(vec![
+                let reduced = self.error_rate_start / self.sim.rng.random_range(4..10);
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  rate      ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
                         format!("{reduced} errors/min"),
@@ -272,49 +240,48 @@ impl IncidentMode {
                     ),
                     Span::styled("  ↓ dropping", Style::default().fg(Color::Green)),
                 ]));
-                self.wait_ticks = self.rng.random_range(10..20);
-                self.progress = 0.75;
+                self.sim.wait_ticks = self.sim.rng.random_range(10..20);
+                self.sim.progress = 0.75;
             }
             _ => {
-                self.log.push(Line::raw(""));
-                self.wait_ticks = self.rng.random_range(4..8);
+                self.sim.log.push(Line::raw(""));
+                self.sim.wait_ticks = self.sim.rng.random_range(4..8);
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(4) {
+            self.phase = Phase::Resolving;
         }
     }
 
     fn tick_resolving(&mut self) {
         let service = self.service.clone();
         let runbook_id = self.runbook_id.clone();
-        match 4 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  monitors  ", Style::default().fg(Color::DarkGray)),
                     Span::styled("all green", Style::default().fg(Color::Green)),
                 ]));
-                self.wait_ticks = self.rng.random_range(8..16);
-                self.progress = 0.85;
+                self.sim.wait_ticks = self.sim.rng.random_range(8..16);
+                self.sim.progress = 0.85;
             }
             1 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  rate      ", Style::default().fg(Color::DarkGray)),
                     Span::styled(
-                        format!("{} errors/min", self.rng.random_range(0..4u32)),
+                        format!("{} errors/min", self.sim.rng.random_range(0..4u32)),
                         Style::default().fg(Color::Green),
                     ),
                     Span::styled("  (normal)", Style::default().fg(Color::DarkGray)),
                 ]));
-                self.wait_ticks = self.rng.random_range(6..14);
-                self.progress = 0.93;
+                self.sim.wait_ticks = self.sim.rng.random_range(6..14);
+                self.sim.progress = 0.93;
             }
             2 => {
-                let elapsed = self.started_at.elapsed().as_secs();
-                self.log.push(Line::raw(""));
-                self.log.push(Line::from(vec![Span::styled(
+                let elapsed = self.sim.started_at.elapsed().as_secs();
+                self.sim.log.push(Line::raw(""));
+                self.sim.log.push(Line::from(vec![Span::styled(
                     format!(
                         "  incident resolved  {}  TTR {}m{}s",
                         service,
@@ -325,32 +292,20 @@ impl IncidentMode {
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD),
                 )]));
-                self.log.push(Line::from(vec![Span::styled(
+                self.sim.log.push(Line::from(vec![Span::styled(
                     format!("  post-mortem  https://runbooks.internal/{runbook_id}/postmortem"),
                     Style::default().fg(Color::DarkGray),
                 )]));
-                self.progress = 1.0;
-                self.status = Status::Success;
-                self.wait_ticks = 0;
+                self.sim.progress = 1.0;
+                self.sim.status = Status::Success;
+                self.sim.wait_ticks = 0;
             }
             _ => {}
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(4) {
+            self.phase = Phase::Done;
         }
-    }
-
-    fn advance_phase(&mut self) {
-        self.phase = self.phase.next();
-        self.phase_lines_remaining = match self.phase {
-            Phase::Detecting => 4,
-            Phase::Triaging => 5,
-            Phase::Mitigating => 4,
-            Phase::Resolving => 4,
-            Phase::Done => 0,
-        };
     }
 }
 

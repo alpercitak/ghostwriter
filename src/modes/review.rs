@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use ratatui::{
@@ -7,7 +5,7 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use super::{RenderState, Status, Tick, TickResult, hash_seed};
+use super::{Sim, Status, Tick};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Phase {
@@ -18,27 +16,9 @@ enum Phase {
     Done,
 }
 
-impl Phase {
-    fn next(self) -> Self {
-        match self {
-            Phase::Linting => Phase::Testing,
-            Phase::Testing => Phase::Coverage,
-            Phase::Coverage => Phase::Approving,
-            Phase::Approving => Phase::Done,
-            Phase::Done => Phase::Done,
-        }
-    }
-}
-
 pub struct ReviewMode {
-    rng: ChaCha8Rng,
-    log: Vec<Line<'static>>,
+    sim: Sim,
     phase: Phase,
-    progress: f64,
-    status: Status,
-    started_at: Instant,
-    wait_ticks: u32,
-    phase_lines_remaining: u32,
 
     author: String,
     branch: String,
@@ -55,25 +35,19 @@ pub struct ReviewMode {
 
 impl ReviewMode {
     pub fn new(seed: &str) -> Self {
-        let mut rng = ChaCha8Rng::seed_from_u64(hash_seed(seed));
+        let mut sim = Sim::new(seed);
 
-        let pr_number = rng.random_range(100..9999u32);
+        let pr_number = sim.rng.random_range(100..9999u32);
         let branch = format!(
             "{}/{}",
-            BRANCH_PREFIXES[rng.random_range(0..BRANCH_PREFIXES.len())],
+            BRANCH_PREFIXES[sim.rng.random_range(0..BRANCH_PREFIXES.len())],
             seed,
         );
-        let total_tests = rng.random_range(24..80u32);
+        let total_tests = sim.rng.random_range(24..80u32);
 
         let mut s = Self {
-            rng,
-            log: Vec::new(),
+            sim,
             phase: Phase::Linting,
-            progress: 0.0,
-            status: Status::Running,
-            started_at: Instant::now(),
-            wait_ticks: 0,
-            phase_lines_remaining: 5,
             author: seed.to_string(),
             branch,
             pr_number,
@@ -83,7 +57,7 @@ impl ReviewMode {
             test_header_emitted: false,
         };
 
-        s.log.push(Line::from(vec![
+        s.sim.log.push(Line::from(vec![
             Span::styled("  PR #", Style::default().fg(Color::DarkGray)),
             Span::styled(
                 s.pr_number.to_string(),
@@ -98,22 +72,28 @@ impl ReviewMode {
                 Style::default().fg(Color::DarkGray),
             ),
         ]));
-        s.log.push(Line::raw(""));
+        s.sim.log.push(Line::raw(""));
         s
     }
 }
 
 impl Tick for ReviewMode {
-    fn tick(&mut self) -> TickResult {
-        if self.phase == Phase::Done {
-            return TickResult::Done;
-        }
+    const TITLE: &'static str = "code review / CI";
+    const SUCCESS_MESSAGE: &'static str = "PR approved";
 
-        if self.wait_ticks > 0 {
-            self.wait_ticks -= 1;
-            return TickResult::Continue;
-        }
+    fn sim(&self) -> &Sim {
+        &self.sim
+    }
 
+    fn sim_mut(&mut self) -> &mut Sim {
+        &mut self.sim
+    }
+
+    fn is_done(&self) -> bool {
+        self.phase == Phase::Done
+    }
+
+    fn step(&mut self) {
         match self.phase {
             Phase::Linting => self.tick_linting(),
             Phase::Testing => self.tick_testing(),
@@ -121,40 +101,27 @@ impl Tick for ReviewMode {
             Phase::Approving => self.tick_approving(),
             Phase::Done => {}
         }
-
-        TickResult::Continue
-    }
-
-    fn state(&self) -> RenderState<'_> {
-        RenderState {
-            title: "code review / CI",
-            success_message: "PR approved",
-            log_lines: &self.log,
-            progress: self.progress,
-            status: self.status,
-            elapsed_secs: self.started_at.elapsed().as_secs(),
-        }
     }
 }
 
 impl ReviewMode {
     fn tick_linting(&mut self) {
-        match 5 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ▶ lint    ", Style::default().fg(Color::Magenta)),
                     Span::raw("running eslint…"),
                 ]));
-                self.wait_ticks = self.rng.random_range(10..20);
-                self.progress = 0.04;
+                self.sim.wait_ticks = self.sim.rng.random_range(10..20);
+                self.sim.progress = 0.04;
             }
             1 | 2 => {
                 // occasional lint warning — not an error, just noise
-                if self.rng.random_bool(0.6) {
-                    let file = random_src_file(&mut self.rng);
-                    let line = self.rng.random_range(10..300u32);
-                    let rule = LINT_RULES[self.rng.random_range(0..LINT_RULES.len())];
-                    self.log.push(Line::from(vec![
+                if self.sim.rng.random_bool(0.6) {
+                    let file = random_src_file(&mut self.sim.rng);
+                    let line = self.sim.rng.random_range(10..300u32);
+                    let rule = LINT_RULES[self.sim.rng.random_range(0..LINT_RULES.len())];
+                    self.sim.log.push(Line::from(vec![
                         Span::styled(
                             format!("  warn  {file}:{line} "),
                             Style::default().fg(Color::Yellow),
@@ -162,88 +129,87 @@ impl ReviewMode {
                         Span::styled(rule, Style::default().fg(Color::DarkGray)),
                     ]));
                 } else {
-                    self.log.push(Line::from(vec![
+                    self.sim.log.push(Line::from(vec![
                         Span::styled("  ok    ", Style::default().fg(Color::Green)),
-                        Span::raw(random_src_file(&mut self.rng)),
+                        Span::raw(random_src_file(&mut self.sim.rng)),
                     ]));
                 }
-                self.wait_ticks = self.rng.random_range(3..9);
-                self.progress = 0.08;
+                self.sim.wait_ticks = self.sim.rng.random_range(3..9);
+                self.sim.progress = 0.08;
             }
             3 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ✔ lint    ", Style::default().fg(Color::Green)),
                     Span::raw("no errors  "),
                     Span::styled(
-                        format!("{} warnings", self.rng.random_range(0..6u32)),
+                        format!("{} warnings", self.sim.rng.random_range(0..6u32)),
                         Style::default().fg(Color::Yellow),
                     ),
                 ]));
-                self.wait_ticks = self.rng.random_range(4..8);
-                self.progress = 0.14;
+                self.sim.wait_ticks = self.sim.rng.random_range(4..8);
+                self.sim.progress = 0.14;
             }
             _ => {
-                self.log.push(Line::raw(""));
-                self.wait_ticks = self.rng.random_range(2..5);
+                self.sim.log.push(Line::raw(""));
+                self.sim.wait_ticks = self.sim.rng.random_range(2..5);
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(5) {
+            self.phase = Phase::Testing;
         }
     }
 
     fn tick_testing(&mut self) {
         if !self.test_header_emitted {
             self.test_header_emitted = true;
-            self.log.push(Line::from(vec![
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ▶ test    ", Style::default().fg(Color::Magenta)),
                 Span::raw(format!("running {} tests…", self.total_tests)),
             ]));
-            self.wait_ticks = self.rng.random_range(4..10);
+            self.sim.wait_ticks = self.sim.rng.random_range(4..10);
             return;
         }
 
         let done = self.passed_tests;
 
         // flaky test: first attempt fails, retry succeeds
-        let flaky = !self.retrying && self.rng.random_bool(0.06);
-        let fail = flaky || self.rng.random_bool(0.02);
+        let flaky = !self.retrying && self.sim.rng.random_bool(0.06);
+        let fail = flaky || self.sim.rng.random_bool(0.02);
 
-        let test_name = random_test_name(&mut self.rng);
+        let test_name = random_test_name(&mut self.sim.rng);
 
         if fail && !self.retrying {
-            self.log.push(Line::from(vec![
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ✖ FAIL   ", Style::default().fg(Color::Red)),
                 Span::raw(test_name.clone()),
                 Span::styled("  (retrying…)", Style::default().fg(Color::Yellow)),
             ]));
             self.retrying = true;
-            self.wait_ticks = self.rng.random_range(12..25);
+            self.sim.wait_ticks = self.sim.rng.random_range(12..25);
         } else if self.retrying {
             // retry always passes (keeps the mood optimistic)
-            self.log.push(Line::from(vec![
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ✔ RETRY  ", Style::default().fg(Color::Yellow)),
                 Span::raw(test_name),
             ]));
             self.retrying = false;
             self.passed_tests += 1;
-            self.wait_ticks = self.rng.random_range(2..6);
+            self.sim.wait_ticks = self.sim.rng.random_range(2..6);
         } else {
-            self.log.push(Line::from(vec![
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ✔ PASS   ", Style::default().fg(Color::Green)),
                 Span::raw(test_name),
             ]));
             self.passed_tests += 1;
-            self.wait_ticks = self.rng.random_range(0..4);
+            self.sim.wait_ticks = self.sim.rng.random_range(0..4);
         }
 
-        self.progress = 0.14 + (done as f64 / self.total_tests as f64) * 0.40;
+        self.sim.progress = 0.14 + (done as f64 / self.total_tests as f64) * 0.40;
 
         if self.passed_tests >= self.total_tests {
-            self.log.push(Line::raw(""));
-            self.log.push(Line::from(vec![
+            self.sim.log.push(Line::raw(""));
+            self.sim.log.push(Line::from(vec![
                 Span::styled("  ✔ tests  ", Style::default().fg(Color::Green)),
                 Span::styled(
                     format!("{} passed", self.passed_tests),
@@ -251,43 +217,43 @@ impl ReviewMode {
                 ),
                 Span::styled("  0 failed", Style::default().fg(Color::DarkGray)),
             ]));
-            self.log.push(Line::raw(""));
-            self.progress = 0.55;
-            self.advance_phase();
+            self.sim.log.push(Line::raw(""));
+            self.sim.progress = 0.55;
+            self.phase = Phase::Coverage;
         }
     }
 
     fn tick_coverage(&mut self) {
-        match 5 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ▶ cover  ", Style::default().fg(Color::Magenta)),
                     Span::raw("measuring coverage…"),
                 ]));
-                self.wait_ticks = self.rng.random_range(8..18);
-                self.progress = 0.60;
+                self.sim.wait_ticks = self.sim.rng.random_range(8..18);
+                self.sim.progress = 0.60;
             }
             1..=3 => {
-                let file = random_src_file(&mut self.rng);
-                let pct = self.rng.random_range(62..100u32);
+                let file = random_src_file(&mut self.sim.rng);
+                let pct = self.sim.rng.random_range(62..100u32);
                 let color = if pct >= 80 {
                     Color::Green
                 } else {
                     Color::Yellow
                 };
-                self.log.push(Line::from(vec![
+                self.sim.log.push(Line::from(vec![
                     Span::styled(
                         format!("  {file:<38} "),
                         Style::default().fg(Color::DarkGray),
                     ),
                     Span::styled(format!("{pct:>3}%"), Style::default().fg(color)),
                 ]));
-                self.wait_ticks = self.rng.random_range(3..8);
-                self.progress = 0.63 + ((4 - self.phase_lines_remaining) as f64 / 5.0) * 0.12;
+                self.sim.wait_ticks = self.sim.rng.random_range(3..8);
+                self.sim.progress = 0.63 + ((self.sim.step - 1) as f64 / 5.0) * 0.12;
             }
             _ => {
-                let total_pct = self.rng.random_range(74..93u32);
-                self.log.push(Line::from(vec![
+                let total_pct = self.sim.rng.random_range(74..93u32);
+                self.sim.log.push(Line::from(vec![
                     Span::styled(
                         "  total                                 ",
                         Style::default().fg(Color::DarkGray),
@@ -299,79 +265,66 @@ impl ReviewMode {
                             .add_modifier(Modifier::BOLD),
                     ),
                 ]));
-                self.log.push(Line::raw(""));
-                self.wait_ticks = self.rng.random_range(4..8);
-                self.progress = 0.75;
+                self.sim.log.push(Line::raw(""));
+                self.sim.wait_ticks = self.sim.rng.random_range(4..8);
+                self.sim.progress = 0.75;
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(5) {
+            self.phase = Phase::Approving;
         }
     }
 
     fn tick_approving(&mut self) {
         let pr = self.pr_number;
-        match 4 - self.phase_lines_remaining {
+        match self.sim.step {
             0 => {
-                let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
-                self.log.push(Line::from(vec![
+                let reviewer = REVIEWERS[self.sim.rng.random_range(0..REVIEWERS.len())];
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  review   ", Style::default().fg(Color::DarkGray)),
                     Span::styled(format!("@{reviewer}"), Style::default().fg(Color::Cyan)),
                     Span::styled(" requested", Style::default().fg(Color::DarkGray)),
                 ]));
-                self.wait_ticks = self.rng.random_range(20..45);
-                self.progress = 0.80;
+                self.sim.wait_ticks = self.sim.rng.random_range(20..45);
+                self.sim.progress = 0.80;
             }
             1 => {
-                let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
-                let comment = REVIEW_COMMENTS[self.rng.random_range(0..REVIEW_COMMENTS.len())];
-                self.log.push(Line::from(vec![
+                let reviewer = REVIEWERS[self.sim.rng.random_range(0..REVIEWERS.len())];
+                let comment = REVIEW_COMMENTS[self.sim.rng.random_range(0..REVIEW_COMMENTS.len())];
+                self.sim.log.push(Line::from(vec![
                     Span::styled(format!("  @{reviewer}  "), Style::default().fg(Color::Cyan)),
                     Span::styled(comment, Style::default().fg(Color::DarkGray)),
                 ]));
-                self.wait_ticks = self.rng.random_range(10..22);
-                self.progress = 0.88;
+                self.sim.wait_ticks = self.sim.rng.random_range(10..22);
+                self.sim.progress = 0.88;
             }
             2 => {
-                let reviewer = REVIEWERS[self.rng.random_range(0..REVIEWERS.len())];
-                self.log.push(Line::from(vec![
+                let reviewer = REVIEWERS[self.sim.rng.random_range(0..REVIEWERS.len())];
+                self.sim.log.push(Line::from(vec![
                     Span::styled("  ✔ approved  ", Style::default().fg(Color::Green)),
                     Span::styled(format!("@{reviewer}"), Style::default().fg(Color::Cyan)),
                 ]));
-                self.wait_ticks = self.rng.random_range(6..14);
-                self.progress = 0.95;
+                self.sim.wait_ticks = self.sim.rng.random_range(6..14);
+                self.sim.progress = 0.95;
             }
             _ => {
-                self.log.push(Line::raw(""));
-                self.log.push(Line::from(vec![Span::styled(
+                self.sim.log.push(Line::raw(""));
+                self.sim.log.push(Line::from(vec![Span::styled(
                     format!("  PR #{pr} merged  ✔  all checks passed"),
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::BOLD),
                 )]));
-                self.progress = 1.0;
-                self.status = Status::Success;
-                self.wait_ticks = 0;
+                self.sim.progress = 1.0;
+                self.sim.status = Status::Success;
+                self.sim.wait_ticks = 0;
             }
         }
 
-        self.phase_lines_remaining -= 1;
-        if self.phase_lines_remaining == 0 {
-            self.advance_phase();
+        if self.sim.next_step(4) {
+            self.phase = Phase::Done;
         }
-    }
-
-    fn advance_phase(&mut self) {
-        self.phase = self.phase.next();
-        self.phase_lines_remaining = match self.phase {
-            Phase::Linting => 5,
-            Phase::Testing => self.total_tests,
-            Phase::Coverage => 5,
-            Phase::Approving => 4,
-            Phase::Done => 0,
-        };
     }
 }
 

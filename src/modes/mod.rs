@@ -3,6 +3,10 @@ pub mod deploy;
 pub mod incident;
 pub mod review;
 
+use std::time::Instant;
+
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use ratatui::text::Line;
 
 pub enum TickResult {
@@ -26,7 +30,7 @@ pub enum Status {
     Success,
 }
 
-pub fn hash_seed(s: &str) -> u64 {
+fn hash_seed(s: &str) -> u64 {
     let mut h: u64 = 0xcbf29ce484222325;
     for b in s.bytes() {
         h ^= b as u64;
@@ -35,9 +39,82 @@ pub fn hash_seed(s: &str) -> u64 {
     h
 }
 
+/// Simulation state shared by every mode.
+pub struct Sim {
+    pub rng: ChaCha8Rng,
+    pub log: Vec<Line<'static>>,
+    pub progress: f64,
+    pub status: Status,
+    pub started_at: Instant,
+    /// Ticks to idle before the next step runs.
+    pub wait_ticks: u32,
+    /// Index of the current step within the current phase.
+    pub step: u32,
+}
+
+impl Sim {
+    pub fn new(seed: &str) -> Self {
+        Self {
+            rng: ChaCha8Rng::seed_from_u64(hash_seed(seed)),
+            log: Vec::new(),
+            progress: 0.0,
+            status: Status::Running,
+            started_at: Instant::now(),
+            wait_ticks: 0,
+            step: 0,
+        }
+    }
+
+    /// Finish the current step. Returns true (and resets the step counter)
+    /// once all `steps` steps of the current phase have run.
+    pub fn next_step(&mut self, steps: u32) -> bool {
+        self.step += 1;
+        if self.step >= steps {
+            self.step = 0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// A simulated activity. Modes provide their content via `step`; pacing and
+/// rendering state come from the provided methods.
 pub trait Tick {
-    fn tick(&mut self) -> TickResult;
-    fn state(&self) -> RenderState<'_>;
+    const TITLE: &'static str;
+    /// Shown in the status line once the run finishes successfully.
+    const SUCCESS_MESSAGE: &'static str;
+
+    fn sim(&self) -> &Sim;
+    fn sim_mut(&mut self) -> &mut Sim;
+    fn is_done(&self) -> bool;
+    /// Emit the next step of the current phase.
+    fn step(&mut self);
+
+    fn tick(&mut self) -> TickResult {
+        if self.is_done() {
+            return TickResult::Done;
+        }
+        let sim = self.sim_mut();
+        if sim.wait_ticks > 0 {
+            sim.wait_ticks -= 1;
+            return TickResult::Continue;
+        }
+        self.step();
+        TickResult::Continue
+    }
+
+    fn state(&self) -> RenderState<'_> {
+        let sim = self.sim();
+        RenderState {
+            title: Self::TITLE,
+            success_message: Self::SUCCESS_MESSAGE,
+            log_lines: &sim.log,
+            progress: sim.progress,
+            status: sim.status,
+            elapsed_secs: sim.started_at.elapsed().as_secs(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -90,8 +167,8 @@ mod tests {
 
     #[test]
     fn every_mode_finishes_for_many_seeds() {
-        // Debug builds panic on integer underflow, so this also guards the
-        // `N - phase_lines_remaining` arithmetic in every phase.
+        // Debug builds panic on integer overflow, so this also guards the
+        // per-phase step arithmetic.
         for i in 0..50 {
             run_all(&format!("seed-{i}"));
         }
