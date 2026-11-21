@@ -30,9 +30,8 @@ pub enum Mode {
     Review,
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let mut app = App::new(cli.mode, cli.seed, cli.speed);
-    app.run().await
+    app.run()
 }

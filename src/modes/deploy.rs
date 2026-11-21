@@ -99,7 +99,7 @@ impl DeployMode {
 }
 
 impl Tick for DeployMode {
-    async fn tick(&mut self) -> TickResult {
+    fn tick(&mut self) -> TickResult {
         if self.phase == Phase::Done {
             return TickResult::Done;
         }

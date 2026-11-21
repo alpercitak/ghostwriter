@@ -87,7 +87,7 @@ impl IncidentMode {
 }
 
 impl Tick for IncidentMode {
-    async fn tick(&mut self) -> TickResult {
+    fn tick(&mut self) -> TickResult {
         if self.phase == Phase::Done {
             return TickResult::Done;
         }

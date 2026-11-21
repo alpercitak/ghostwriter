@@ -38,6 +38,6 @@ pub fn hash_seed(s: &str) -> u64 {
 }
 
 pub trait Tick {
-    async fn tick(&mut self) -> TickResult;
+    fn tick(&mut self) -> TickResult;
     fn state(&self) -> RenderState<'_>;
 }

@@ -25,7 +25,7 @@ impl App {
         Self { mode, seed, speed }
     }
 
-    pub async fn run(&mut self) -> anyhow::Result<()> {
+    pub fn run(&mut self) -> anyhow::Result<()> {
         // Enters raw mode + alternate screen and installs a panic hook that
         // restores the terminal, so a crash never leaves the shell unusable.
         let mut terminal = ratatui::try_init()?;
@@ -33,19 +33,19 @@ impl App {
         let result = match self.mode {
             Mode::Build => {
                 let mut mode = BuildMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode, self.speed).await
+                self.event_loop(&mut terminal, &mut mode, self.speed)
             }
             Mode::Deploy => {
                 let mut mode = DeployMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode, self.speed).await
+                self.event_loop(&mut terminal, &mut mode, self.speed)
             }
             Mode::Incident => {
                 let mut mode = IncidentMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode, self.speed).await
+                self.event_loop(&mut terminal, &mut mode, self.speed)
             }
             Mode::Review => {
                 let mut mode = ReviewMode::new(&self.seed);
-                self.event_loop(&mut terminal, &mut mode, self.speed).await
+                self.event_loop(&mut terminal, &mut mode, self.speed)
             }
         };
 
@@ -55,7 +55,7 @@ impl App {
         result
     }
 
-    async fn event_loop<B, M>(
+    fn event_loop<B, M>(
         &self,
         terminal: &mut Terminal<B>,
         mode: &mut M,
@@ -90,7 +90,7 @@ impl App {
                 }
             }
 
-            match mode.tick().await {
+            match mode.tick() {
                 TickResult::Continue => {}
                 TickResult::Done => {
                     terminal.draw(|frame| ui::render(frame, mode.state()))?;

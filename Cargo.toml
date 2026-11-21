@@ -15,8 +15,6 @@ crossterm   = "0.29"
 rand        = "0.10"
 rand_chacha = "0.10"
 clap        = { version = "4.6", features = ["derive"] }
-tokio       = { version = "1.43", features = ["full"] }
-async-trait = "0.1"
 anyhow      = "1.0"
 
 [profile.release]
