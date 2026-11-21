@@ -93,7 +93,6 @@ impl Tick for BuildMode {
 
         if self.wait_ticks > 0 {
             self.wait_ticks -= 1;
-            tokio::time::sleep(std::time::Duration::from_millis(16)).await;
             return TickResult::Continue;
         }
 

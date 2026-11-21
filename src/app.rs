@@ -1,5 +1,5 @@
 use std::io;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::{
     event::{self, Event, KeyCode},
@@ -16,6 +16,8 @@ use crate::{
     },
     ui,
 };
+
+const BASE_TICK: Duration = Duration::from_millis(100);
 
 pub struct App {
     mode: Mode,
@@ -75,23 +77,32 @@ impl App {
         M: Tick,
         <B as Backend>::Error: std::error::Error + Send + Sync + 'static,
     {
+        // One tick = one step of the simulation; all pacing lives here so
+        // `--speed` scales the whole playback uniformly.
+        let tick = BASE_TICK.div_f32(speed.max(0.1));
+
         loop {
             terminal.draw(|frame| {
                 ui::render(frame, mode.state());
             })?;
 
-            if event::poll(Duration::from_millis(50))?
-                && let Event::Key(key) = event::read()?
-                && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
-            {
-                break;
+            // Wait out the tick while staying responsive to key presses.
+            let deadline = Instant::now() + tick;
+            loop {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                if event::poll(remaining)?
+                    && let Event::Key(key) = event::read()?
+                    && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
+                {
+                    return Ok(());
+                }
             }
 
             match mode.tick().await {
-                TickResult::Continue => {
-                    let delay = (50.0 / speed.max(0.1)) as u64;
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
-                }
+                TickResult::Continue => {}
                 TickResult::Done => {
                     terminal.draw(|frame| ui::render(frame, mode.state()))?;
                     loop {
