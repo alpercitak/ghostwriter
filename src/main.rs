@@ -20,6 +20,11 @@ struct Cli {
     /// Playback speed multiplier (0.5 = half speed, 2.0 = double)
     #[arg(long, default_value = "1.0", value_parser = parse_speed)]
     speed: f32,
+
+    /// Keep playing: start the next run (seed `<seed>-1`, `<seed>-2`, …)
+    /// after each one finishes
+    #[arg(long = "loop")]
+    looping: bool,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -47,6 +52,6 @@ fn parse_speed(s: &str) -> Result<f32, String> {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let mut app = App::new(cli.mode, cli.seed, cli.speed);
+    let mut app = App::new(cli.mode, cli.seed, cli.speed, cli.looping);
     app.run()
 }

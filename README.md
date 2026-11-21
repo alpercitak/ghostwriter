@@ -53,6 +53,7 @@ Options:
                    build | deploy | incident | review
   --seed <SEED>    Repo or author name [default: my-app]
   --speed <SPEED>  Playback speed multiplier, 0.01–100 [default: 1.0]
+  --loop           Start a new run after each one finishes, until you quit
 ```
 
 Same `--seed` always produces the same output, useful for repeatable screen recordings.
@@ -61,7 +62,10 @@ Same `--seed` always produces the same output, useful for repeatable screen reco
 ghostwriter --mode incident --seed payments-api
 ghostwriter --mode deploy --seed my-app --speed 2.0
 ghostwriter --mode review --seed my-app --speed 0.5
+ghostwriter --mode build --loop    # runs forever, q to quit
 ```
+
+With `--loop`, runs use the seeds `<seed>`, `<seed>-1`, `<seed>-2`, … so a looped session is repeatable too.
 
 ## Modes
 

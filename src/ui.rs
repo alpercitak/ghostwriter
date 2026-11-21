@@ -7,7 +7,8 @@ use ratatui::{
 
 use crate::modes::{RenderState, Status};
 
-pub fn render(frame: &mut Frame, state: RenderState<'_>) {
+/// `looping`: whether another run starts automatically after this one.
+pub fn render(frame: &mut Frame, state: RenderState<'_>, looping: bool) {
     let area = frame.area();
 
     let chunks = Layout::default()
@@ -53,6 +54,12 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
 
     let status_text = match state.status {
         Status::Running => format!(" running  {}s elapsed    q to quit", state.elapsed_secs),
+        Status::Success if looping => {
+            format!(
+                " {} — next run starting…    q to quit",
+                state.success_message
+            )
+        }
         Status::Success => format!(" {} — press any key to exit", state.success_message),
     };
 
