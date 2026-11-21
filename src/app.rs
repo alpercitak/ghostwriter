@@ -6,7 +6,7 @@ use ratatui::{Terminal, backend::Backend};
 use crate::{
     Mode,
     modes::{
-        Tick, TickResult, build::BuildMode, deploy::DeployMode, incident::IncidentMode,
+        Status, Tick, TickResult, build::BuildMode, deploy::DeployMode, incident::IncidentMode,
         review::ReviewMode,
     },
     ui,
@@ -75,7 +75,10 @@ impl App {
                 ui::render(frame, mode.state());
             })?;
 
-            // Wait out the tick while staying responsive to key presses.
+            // Wait out the tick while staying responsive to key presses. Once
+            // the run has finished, the UI already says "press any key", so
+            // any key exits even if the mode still has a few ticks to play.
+            let finished = mode.state().status != Status::Running;
             let deadline = Instant::now() + tick;
             loop {
                 let remaining = deadline.saturating_duration_since(Instant::now());
@@ -84,7 +87,7 @@ impl App {
                 }
                 if event::poll(remaining)?
                     && let Event::Key(key) = event::read()?
-                    && is_quit(key)
+                    && (finished || is_quit(key))
                 {
                     return Ok(());
                 }
