@@ -1,12 +1,7 @@
-use std::io;
 use std::time::{Duration, Instant};
 
-use crossterm::{
-    event::{self, Event, KeyCode},
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
-use ratatui::{Terminal, backend::Backend, backend::CrosstermBackend};
+use crossterm::event::{self, Event, KeyCode};
+use ratatui::{Terminal, backend::Backend};
 
 use crate::{
     Mode,
@@ -31,14 +26,9 @@ impl App {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-
-        execute!(stdout, EnterAlternateScreen)?;
-
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
-        terminal.clear()?;
+        // Enters raw mode + alternate screen and installs a panic hook that
+        // restores the terminal, so a crash never leaves the shell unusable.
+        let mut terminal = ratatui::try_init()?;
 
         let result = match self.mode {
             Mode::Build => {
@@ -59,9 +49,8 @@ impl App {
             }
         };
 
-        disable_raw_mode()?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-        terminal.show_cursor()?;
+        // Restore even if the event loop returned an error.
+        ratatui::restore();
 
         result
     }
