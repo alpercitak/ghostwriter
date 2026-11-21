@@ -74,3 +74,119 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>, seed: &str, looping: bo
     let status_widget = Paragraph::new(status_text).style(status_style);
     frame.render_widget(status_widget, chunks[2]);
 }
+
+#[cfg(test)]
+mod tests {
+    use ratatui::{Terminal, backend::TestBackend, text::Line};
+
+    use super::render;
+    use crate::modes::{RenderState, Status};
+
+    /// Render one frame and return the screen as plain text rows.
+    fn screen(state: RenderState<'_>, seed: &str, looping: bool, w: u16, h: u16) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+        terminal
+            .draw(|frame| render(frame, state, seed, looping))
+            .unwrap();
+        let buf = terminal.backend().buffer();
+        (0..h)
+            .map(|y| (0..w).map(|x| buf[(x, y)].symbol()).collect())
+            .collect()
+    }
+
+    fn log(n: usize) -> Vec<Line<'static>> {
+        (1..=n).map(|i| Line::raw(format!("line {i}"))).collect()
+    }
+
+    fn state<'a>(lines: &'a [Line<'static>], progress: f64, status: Status) -> RenderState<'a> {
+        RenderState {
+            title: "webpack build",
+            success_message: "build succeeded",
+            log_lines: lines,
+            progress,
+            status,
+            elapsed_secs: 7,
+        }
+    }
+
+    #[test]
+    fn running_frame() {
+        let lines = log(3);
+        let expected = [
+            "┌ ✦ ghostwriter — webpack build · seed quiet-ledger ───────┐",
+            "│line 1                                                    │",
+            "│line 2                                                    │",
+            "│line 3                                                    │",
+            "│                                                          │",
+            "└──────────────────────────────────────────────────────────┘",
+            "┌──────────────────────────────────────────────────────────┐",
+            "│████████████████████████   42%                            │",
+            "└──────────────────────────────────────────────────────────┘",
+            " running  7s elapsed    q to quit                           ",
+        ];
+        assert_eq!(
+            screen(
+                state(&lines, 0.42, Status::Running),
+                "quiet-ledger",
+                false,
+                60,
+                10
+            ),
+            expected
+        );
+    }
+
+    #[test]
+    fn finished_frame_in_loop_mode_scrolls_log() {
+        let lines = log(12);
+        let expected = [
+            "┌ ✦ ghostwriter — webpack build · seed quiet-ledger ───────┐",
+            "│line 9                                                    │",
+            "│line 10                                                   │",
+            "│line 11                                                   │",
+            "│line 12                                                   │",
+            "└──────────────────────────────────────────────────────────┘",
+            "┌──────────────────────────────────────────────────────────┐",
+            "│███████████████████████████done ██████████████████████████│",
+            "└──────────────────────────────────────────────────────────┘",
+            " build succeeded — next run starting…    q to quit          ",
+        ];
+        assert_eq!(
+            screen(
+                state(&lines, 1.0, Status::Success),
+                "quiet-ledger",
+                true,
+                60,
+                10
+            ),
+            expected
+        );
+    }
+
+    #[test]
+    fn finished_frame() {
+        let lines = log(12);
+        let expected = [
+            "┌ ✦ ghostwriter — webpack build · seed quiet-ledger ───────┐",
+            "│line 9                                                    │",
+            "│line 10                                                   │",
+            "│line 11                                                   │",
+            "│line 12                                                   │",
+            "└──────────────────────────────────────────────────────────┘",
+            "┌──────────────────────────────────────────────────────────┐",
+            "│███████████████████████████done ██████████████████████████│",
+            "└──────────────────────────────────────────────────────────┘",
+            " build succeeded — press any key to exit                    ",
+        ];
+        assert_eq!(
+            screen(
+                state(&lines, 1.0, Status::Success),
+                "quiet-ledger",
+                false,
+                60,
+                10
+            ),
+            expected
+        );
+    }
+}
