@@ -47,7 +47,6 @@ pub struct ReviewMode {
     // test tracking
     total_tests: u32,
     passed_tests: u32,
-    failed_tests: u32,
 
     // flaky retry state
     retrying: bool,
@@ -80,7 +79,6 @@ impl ReviewMode {
             pr_number,
             total_tests,
             passed_tests: 0,
-            failed_tests: 0,
             retrying: false,
             test_header_emitted: false,
         };
@@ -207,7 +205,7 @@ impl ReviewMode {
             return;
         }
 
-        let done = self.passed_tests + self.failed_tests;
+        let done = self.passed_tests;
 
         // flaky test: first attempt fails, retry succeeds
         let flaky = !self.retrying && self.rng.random_bool(0.06);
@@ -243,7 +241,7 @@ impl ReviewMode {
 
         self.progress = 0.14 + (done as f64 / self.total_tests as f64) * 0.40;
 
-        if self.passed_tests + self.failed_tests >= self.total_tests {
+        if self.passed_tests >= self.total_tests {
             self.log.push(Line::raw(""));
             self.log.push(Line::from(vec![
                 Span::styled("  ✔ tests  ", Style::default().fg(Color::Green)),
@@ -251,14 +249,7 @@ impl ReviewMode {
                     format!("{} passed", self.passed_tests),
                     Style::default().fg(Color::Green),
                 ),
-                if self.failed_tests > 0 {
-                    Span::styled(
-                        format!("  {} failed", self.failed_tests),
-                        Style::default().fg(Color::Red),
-                    )
-                } else {
-                    Span::styled("  0 failed", Style::default().fg(Color::DarkGray))
-                },
+                Span::styled("  0 failed", Style::default().fg(Color::DarkGray)),
             ]));
             self.log.push(Line::raw(""));
             self.progress = 0.55;

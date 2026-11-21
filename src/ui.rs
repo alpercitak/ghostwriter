@@ -38,7 +38,6 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
     let (bar_color, bar_label) = match state.status {
         Status::Running => (Color::Cyan, format!("{:.0}%", state.progress * 100.0)),
         Status::Success => (Color::Green, "done".to_string()),
-        Status::Failed => (Color::Red, "failed".to_string()),
     };
 
     let gauge = Gauge::default()
@@ -55,7 +54,6 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
     let status_text = match state.status {
         Status::Running => format!(" running  {}s elapsed    q to quit", state.elapsed_secs),
         Status::Success => format!(" {} — press any key to exit", state.success_message),
-        Status::Failed => format!(" {} failed — press any key to exit", state.title),
     };
 
     let status_style = match state.status {
@@ -63,7 +61,6 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
         Status::Success => Style::default()
             .fg(Color::Green)
             .add_modifier(Modifier::BOLD),
-        Status::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
     };
 
     let status_widget = Paragraph::new(status_text).style(status_style);

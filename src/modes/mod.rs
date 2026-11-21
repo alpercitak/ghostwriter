@@ -24,8 +24,6 @@ pub struct RenderState<'a> {
 pub enum Status {
     Running,
     Success,
-    #[allow(dead_code)]
-    Failed,
 }
 
 pub fn hash_seed(s: &str) -> u64 {
