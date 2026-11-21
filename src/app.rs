@@ -66,7 +66,7 @@ impl App {
     {
         // One tick = one step of the simulation; all pacing lives here so
         // `--speed` scales the whole playback uniformly.
-        let tick = TICK.div_f32(speed.max(0.1));
+        let tick = TICK.div_f32(speed);
 
         loop {
             terminal.draw(|frame| {

@@ -52,7 +52,7 @@ Options:
   --mode <MODE>    Activity to simulate [default: build]
                    build | deploy | incident | review
   --seed <SEED>    Repo or author name [default: my-app]
-  --speed <SPEED>  Playback speed multiplier [default: 1.0]
+  --speed <SPEED>  Playback speed multiplier, 0.01–100 [default: 1.0]
 ```
 
 Same `--seed` always produces the same output, useful for repeatable screen recordings.
