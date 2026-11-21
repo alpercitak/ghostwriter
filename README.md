@@ -51,12 +51,12 @@ cargo install --path .
 Options:
   --mode <MODE>    Activity to simulate [default: build]
                    build | deploy | incident | review
-  --seed <SEED>    Repo or author name [default: my-app]
+  --seed <SEED>    Repo or author name [default: random, e.g. quiet-ledger]
   --speed <SPEED>  Playback speed multiplier, 0.01–100 [default: 1.0]
   --loop           Start a new run after each one finishes, until you quit
 ```
 
-Same `--seed` always produces the same output, useful for repeatable screen recordings.
+Same `--seed` always produces the same output, useful for repeatable screen recordings. Without `--seed` every run is different; the seed is shown in the title bar, so you can replay a run you liked with `--seed <name>`.
 
 ```bash
 ghostwriter --mode incident --seed payments-api

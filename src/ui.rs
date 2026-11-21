@@ -7,8 +7,9 @@ use ratatui::{
 
 use crate::modes::{RenderState, Status};
 
-/// `looping`: whether another run starts automatically after this one.
-pub fn render(frame: &mut Frame, state: RenderState<'_>, looping: bool) {
+/// `seed` is shown in the title so any run can be reproduced; `looping` says
+/// whether another run starts automatically after this one.
+pub fn render(frame: &mut Frame, state: RenderState<'_>, seed: &str, looping: bool) {
     let area = frame.area();
 
     let chunks = Layout::default()
@@ -29,7 +30,7 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>, looping: bool) {
         .collect();
 
     let log_block = Block::default()
-        .title(format!(" ✦ ghostwriter — {} ", state.title))
+        .title(format!(" ✦ ghostwriter — {} · seed {seed} ", state.title))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray));
 

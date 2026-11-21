@@ -79,10 +79,10 @@ impl App {
             };
             let mut mode = new_mode(&seed);
 
-            if self.play(terminal, &mut mode, tick)? == Outcome::Quit {
+            if self.play(terminal, &mut mode, &seed, tick)? == Outcome::Quit {
                 break;
             }
-            self.draw(terminal, &mode)?;
+            self.draw(terminal, &mode, &seed)?;
 
             if !self.looping {
                 while poll_key_press(Duration::from_millis(200))?.is_none() {}
@@ -101,6 +101,7 @@ impl App {
         &self,
         terminal: &mut Terminal<B>,
         mode: &mut M,
+        seed: &str,
         tick: Duration,
     ) -> anyhow::Result<Outcome>
     where
@@ -109,7 +110,7 @@ impl App {
         <B as Backend>::Error: std::error::Error + Send + Sync + 'static,
     {
         loop {
-            self.draw(terminal, mode)?;
+            self.draw(terminal, mode, seed)?;
 
             // Once the run has finished, the UI already says "press any key",
             // so any key exits even if the mode still has a few ticks to play.
@@ -125,13 +126,13 @@ impl App {
         }
     }
 
-    fn draw<B, M>(&self, terminal: &mut Terminal<B>, mode: &M) -> anyhow::Result<()>
+    fn draw<B, M>(&self, terminal: &mut Terminal<B>, mode: &M, seed: &str) -> anyhow::Result<()>
     where
         B: Backend,
         M: Tick,
         <B as Backend>::Error: std::error::Error + Send + Sync + 'static,
     {
-        terminal.draw(|frame| ui::render(frame, mode.state(), self.looping))?;
+        terminal.draw(|frame| ui::render(frame, mode.state(), seed, self.looping))?;
         Ok(())
     }
 }
