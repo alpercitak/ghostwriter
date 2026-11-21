@@ -12,6 +12,8 @@ pub enum TickResult {
 
 pub struct RenderState<'a> {
     pub title: &'a str,
+    /// Shown in the status line once the run finishes successfully.
+    pub success_message: &'a str,
     pub log_lines: &'a [Line<'static>],
     pub progress: f64,
     pub status: Status,

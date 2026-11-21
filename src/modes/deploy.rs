@@ -123,6 +123,7 @@ impl Tick for DeployMode {
     fn state(&self) -> RenderState<'_> {
         RenderState {
             title: "kubectl rollout",
+            success_message: "rollout complete",
             log_lines: &self.log,
             progress: self.progress,
             status: self.status,

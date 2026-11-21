@@ -130,6 +130,7 @@ impl Tick for ReviewMode {
     fn state(&self) -> RenderState<'_> {
         RenderState {
             title: "code review / CI",
+            success_message: "PR approved",
             log_lines: &self.log,
             progress: self.progress,
             status: self.status,

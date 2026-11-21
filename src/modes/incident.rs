@@ -111,6 +111,7 @@ impl Tick for IncidentMode {
     fn state(&self) -> RenderState<'_> {
         RenderState {
             title: "incident response",
+            success_message: "incident resolved",
             log_lines: &self.log,
             progress: self.progress,
             status: self.status,

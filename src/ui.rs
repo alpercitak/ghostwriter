@@ -54,8 +54,8 @@ pub fn render(frame: &mut Frame, state: RenderState<'_>) {
 
     let status_text = match state.status {
         Status::Running => format!(" running  {}s elapsed    q to quit", state.elapsed_secs),
-        Status::Success => " build succeeded — press any key to exit".to_string(),
-        Status::Failed => " build failed — press any key to exit".to_string(),
+        Status::Success => format!(" {} — press any key to exit", state.success_message),
+        Status::Failed => format!(" {} failed — press any key to exit", state.title),
     };
 
     let status_style = match state.status {

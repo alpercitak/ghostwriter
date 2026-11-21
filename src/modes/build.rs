@@ -110,6 +110,7 @@ impl Tick for BuildMode {
     fn state(&self) -> RenderState<'_> {
         RenderState {
             title: "webpack build",
+            success_message: "build succeeded",
             log_lines: &self.log,
             progress: self.progress,
             status: self.status,
