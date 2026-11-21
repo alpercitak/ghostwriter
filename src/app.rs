@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Terminal, backend::Backend};
 
 use crate::{
@@ -84,7 +84,7 @@ impl App {
                 }
                 if event::poll(remaining)?
                     && let Event::Key(key) = event::read()?
-                    && (key.code == KeyCode::Char('q') || key.code == KeyCode::Esc)
+                    && is_quit(key)
                 {
                     return Ok(());
                 }
@@ -107,5 +107,15 @@ impl App {
         }
 
         Ok(())
+    }
+}
+
+/// `q`, `Esc`, or Ctrl+C. Raw mode delivers Ctrl+C as a key event rather
+/// than SIGINT, so it has to be handled explicitly.
+fn is_quit(key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Char('q') | KeyCode::Esc => true,
+        KeyCode::Char('c') => key.modifiers.contains(KeyModifiers::CONTROL),
+        _ => false,
     }
 }
