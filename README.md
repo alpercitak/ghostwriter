@@ -23,7 +23,14 @@ Download the latest binary for your platform from [releases](../../releases):
 | macOS (Apple Silicon) | `ghostwriter-aarch64-apple-darwin` |
 | macOS (Intel) | `ghostwriter-x86_64-apple-darwin` |
 | Linux (x86_64) | `ghostwriter-x86_64-unknown-linux-gnu` |
+| Linux (arm64) | `ghostwriter-aarch64-unknown-linux-gnu` |
 | Windows (x86_64) | `ghostwriter-x86_64-pc-windows-msvc.exe` |
+
+Each release also includes a `SHA256SUMS` file. To verify a download:
+
+```bash
+shasum -a 256 -c SHA256SUMS --ignore-missing
+```
 
 On macOS / Linux, make it executable and put it on your `PATH`:
 
