@@ -50,7 +50,7 @@ cargo install --path .
 ```
 Options:
   --mode <MODE>    Activity to simulate [default: build]
-                   build | deploy | incident | review
+                   build | deploy | incident | review | terraform
   --seed <SEED>    Repo or author name [default: random, e.g. quiet-ledger]
   --speed <SPEED>  Playback speed multiplier, 0.01–100 [default: 1.0]
   --loop           Start a new run after each one finishes, until you quit
@@ -75,6 +75,7 @@ With `--loop`, runs use the seeds `<seed>`, `<seed>-1`, `<seed>-2`, … so a loo
 | `deploy` | Kubernetes rollout — image pull, pod scheduling, health checks |
 | `incident` | On-call response — alert, triage, mitigation, resolution |
 | `review` | CI pipeline — lint, test suite with flaky retries, coverage, approval |
+| `terraform` | `terraform apply` — init, state refresh, plan, per-resource apply |
 
 ## Build from source
 

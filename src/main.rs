@@ -35,6 +35,7 @@ pub enum Mode {
     Deploy,
     Incident,
     Review,
+    Terraform,
 }
 
 const SPEED_RANGE: std::ops::RangeInclusive<f32> = 0.01..=100.0;
