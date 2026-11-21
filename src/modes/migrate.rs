@@ -62,13 +62,10 @@ impl MigrateMode {
             .map(|_| {
                 let v = version(rng);
                 let verb = VERBS[rng.random_range(0..VERBS.len())];
-                let object = OBJECTS[rng.random_range(0..OBJECTS.len())];
-                let rewrite = rng.random_bool(0.25).then(|| {
-                    (
-                        TABLES[rng.random_range(0..TABLES.len())],
-                        rng.random_range(5..120u32) as f32 / 10.0,
-                    )
-                });
+                let (object, table) = OBJECTS[rng.random_range(0..OBJECTS.len())];
+                let rewrite = rng
+                    .random_bool(0.25)
+                    .then(|| (table, rng.random_range(5..120u32) as f32 / 10.0));
                 Migration {
                     name: format!("{v}_{verb}_{object}"),
                     rewrite,
@@ -276,14 +273,14 @@ impl MigrateMode {
 }
 
 static VERBS: &[&str] = &["add", "create", "drop", "rename", "backfill", "alter"];
-static OBJECTS: &[&str] = &[
-    "index_to_orders",
-    "users_email_verified",
-    "payments_status",
-    "sessions_expires_at",
-    "audit_log_table",
-    "invoices_currency",
-    "events_partition",
-    "feature_flags",
+/// Migration subject and the table it touches (rewritten by slow migrations).
+static OBJECTS: &[(&str, &str)] = &[
+    ("index_to_orders", "orders"),
+    ("users_email_verified", "users"),
+    ("payments_status", "payments"),
+    ("sessions_expires_at", "sessions"),
+    ("audit_log_table", "audit_log"),
+    ("invoices_currency", "invoices"),
+    ("events_partition", "events"),
+    ("feature_flags", "feature_flags"),
 ];
-static TABLES: &[&str] = &["orders", "users", "events", "payments", "audit_log"];
