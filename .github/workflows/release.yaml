@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  # Manual runs build every target without publishing, to test the workflow.
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,6 +14,9 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            artifact: ghostwriter
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
             artifact: ghostwriter
           - os: macos-latest
             target: x86_64-apple-darwin
@@ -31,6 +36,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: build
         run: cargo build --release --target ${{ matrix.target }}
@@ -59,6 +68,14 @@ jobs:
           path: dist/
           merge-multiple: true
 
+      - name: checksums
+        working-directory: dist
+        run: |
+          sha256sum ghostwriter-* > SHA256SUMS
+          cat SHA256SUMS
+
       - uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: dist/*
+          generate_release_notes: true
