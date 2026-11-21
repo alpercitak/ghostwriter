@@ -16,14 +16,25 @@ Press `q` or `Esc` to quit.
 
 ## Install
 
-Download the latest binary from [releases](../../releases) for your platform, then:
+Download the latest binary for your platform from [releases](../../releases):
+
+| Platform | Binary |
+|----------|--------|
+| macOS (Apple Silicon) | `ghostwriter-aarch64-apple-darwin` |
+| macOS (Intel) | `ghostwriter-x86_64-apple-darwin` |
+| Linux (x86_64) | `ghostwriter-x86_64-unknown-linux-gnu` |
+| Windows (x86_64) | `ghostwriter-x86_64-pc-windows-msvc.exe` |
+
+On macOS / Linux, make it executable and put it on your `PATH`:
 
 ```bash
-# macOS / Linux
-chmod +x ghostwriter-x86_64-apple-darwin
-mv ghostwriter-x86_64-apple-darwin /usr/local/bin/ghostwriter
+chmod +x ghostwriter-aarch64-apple-darwin
+mv ghostwriter-aarch64-apple-darwin /usr/local/bin/ghostwriter
+```
 
-# or build from source
+Or build from source:
+
+```bash
 cargo install --path .
 ```
 
