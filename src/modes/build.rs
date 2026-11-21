@@ -71,7 +71,7 @@ impl BuildMode {
 
         s.log.push(Line::from(vec![Span::styled(
             format!(
-                "[webpack {}.{}.{} compiled with configuration",
+                "webpack {}.{}.{} — building in production mode",
                 s.rng.random_range(4..6u8),
                 s.rng.random_range(0..9u8),
                 s.rng.random_range(0..20u8)
@@ -122,9 +122,9 @@ impl Tick for BuildMode {
 impl BuildMode {
     fn tick_resolving(&mut self) {
         let lines = [
-            "asset ./dist/main.js",
-            "asset ./dist/vendors~main.js",
-            "  resolve ./node_modules → entry point",
+            "resolving entry ./src/index.tsx",
+            "resolving ./node_modules",
+            "resolved dependency graph",
         ];
         let idx = (3 - self.phase_lines_remaining) as usize;
         self.log
