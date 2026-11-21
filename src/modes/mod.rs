@@ -1,6 +1,7 @@
 pub mod build;
 pub mod deploy;
 pub mod incident;
+pub mod migrate;
 pub mod review;
 pub mod terraform;
 
@@ -133,7 +134,7 @@ pub trait Tick {
 mod tests {
     use super::{
         Status, Tick, TickResult, build::BuildMode, deploy::DeployMode, incident::IncidentMode,
-        review::ReviewMode, terraform::TerraformMode,
+        migrate::MigrateMode, review::ReviewMode, terraform::TerraformMode,
     };
 
     /// Far more ticks than any mode needs; hitting it means a mode never finishes.
@@ -167,6 +168,7 @@ mod tests {
             run_to_done(IncidentMode::new(seed)),
             run_to_done(ReviewMode::new(seed)),
             run_to_done(TerraformMode::new(seed)),
+            run_to_done(MigrateMode::new(seed)),
         ]
     }
 

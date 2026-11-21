@@ -7,7 +7,7 @@ use crate::{
     Mode,
     modes::{
         Status, TICK, Tick, TickResult, build::BuildMode, deploy::DeployMode,
-        incident::IncidentMode, review::ReviewMode, terraform::TerraformMode,
+        incident::IncidentMode, migrate::MigrateMode, review::ReviewMode, terraform::TerraformMode,
     },
     ui,
 };
@@ -49,6 +49,7 @@ impl App {
             Mode::Incident => self.run_mode(&mut terminal, IncidentMode::new),
             Mode::Review => self.run_mode(&mut terminal, ReviewMode::new),
             Mode::Terraform => self.run_mode(&mut terminal, TerraformMode::new),
+            Mode::Migrate => self.run_mode(&mut terminal, MigrateMode::new),
         };
 
         // Restore even if the event loop returned an error.
