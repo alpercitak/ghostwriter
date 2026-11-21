@@ -19,7 +19,7 @@ struct Cli {
     #[arg(long)]
     seed: Option<String>,
 
-    /// Playback speed multiplier (0.5 = half speed, 2.0 = double)
+    /// Playback speed multiplier, 0.01–100 (0.5 = half speed, 2.0 = double)
     #[arg(long, default_value = "1.0", value_parser = parse_speed)]
     speed: f32,
 
