@@ -14,7 +14,7 @@ struct Cli {
     mode: Mode,
 
     /// Optional seed string (e.g. repo name) for consistent output
-    #[arg(long, default_value = "ghost")]
+    #[arg(long, default_value = "my-app")]
     seed: String,
 
     /// Playback speed multiplier (0.5 = half speed, 2.0 = double)
